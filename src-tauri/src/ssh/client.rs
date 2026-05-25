@@ -57,12 +57,18 @@ impl RemoteCommand {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MetricsBatchMode {
     Fast,
+    Slow,
+    Process,
     Full,
 }
 
 impl MetricsBatchMode {
     fn includes_slow_metrics(self) -> bool {
-        matches!(self, Self::Full)
+        matches!(self, Self::Slow | Self::Full)
+    }
+
+    fn includes_process_metrics(self) -> bool {
+        matches!(self, Self::Process | Self::Full)
     }
 }
 
@@ -108,7 +114,7 @@ pub trait SshClient: Send + Sync {
         };
         let net_dev = self.exec(host, RemoteCommand::ProcNetDev).await?;
         let diskstats = self.exec(host, RemoteCommand::ProcDiskstats).await?;
-        let ps = if mode.includes_slow_metrics() {
+        let ps = if mode.includes_process_metrics() {
             Some(self.exec(host, RemoteCommand::Ps).await?)
         } else {
             None
@@ -181,7 +187,7 @@ impl OpenSshClient {
         let mut builder = SessionBuilder::default();
         builder
             .port(host.port)
-            .known_hosts_check(KnownHosts::Add)
+            .known_hosts_check(KnownHosts::Strict)
             .connect_timeout(std::time::Duration::from_secs(8))
             .server_alive_interval(std::time::Duration::from_secs(15));
 
@@ -391,6 +397,8 @@ impl OpenSshClient {
     ) -> Result<RemoteMetricsOutput, AppError> {
         let script = match mode {
             MetricsBatchMode::Fast => FAST_METRICS_SCRIPT,
+            MetricsBatchMode::Slow => SLOW_METRICS_SCRIPT,
+            MetricsBatchMode::Process => PROCESS_METRICS_SCRIPT,
             MetricsBatchMode::Full => FULL_METRICS_SCRIPT,
         };
 
@@ -486,6 +494,46 @@ section diskstats
 cat /proc/diskstats
 "#;
 
+const SLOW_METRICS_SCRIPT: &str = r#"
+set -e
+section() { printf '\n__VPSCOPE_SECTION:%s__\n' "$1"; }
+section uname
+uname -a
+section loadavg
+cat /proc/loadavg
+section uptime
+cat /proc/uptime
+section proc_stat
+cat /proc/stat
+section meminfo
+cat /proc/meminfo
+section df
+df -P
+section net_dev
+cat /proc/net/dev
+section diskstats
+cat /proc/diskstats
+"#;
+
+const PROCESS_METRICS_SCRIPT: &str = r#"
+set -e
+section() { printf '\n__VPSCOPE_SECTION:%s__\n' "$1"; }
+section loadavg
+cat /proc/loadavg
+section uptime
+cat /proc/uptime
+section proc_stat
+cat /proc/stat
+section meminfo
+cat /proc/meminfo
+section net_dev
+cat /proc/net/dev
+section diskstats
+cat /proc/diskstats
+section ps
+ps -eo pid,ppid,user,stat,pcpu,pmem,rss,args
+"#;
+
 const FULL_METRICS_SCRIPT: &str = r#"
 set -e
 section() { printf '\n__VPSCOPE_SECTION:%s__\n' "$1"; }
@@ -524,7 +572,7 @@ fn parse_metrics_batch_output(
         df: optional_section(&sections, "df", mode)?,
         net_dev: required_section(&sections, "net_dev")?,
         diskstats: required_section(&sections, "diskstats")?,
-        ps: optional_section(&sections, "ps", mode)?,
+        ps: optional_process_section(&sections, "ps", mode)?,
     })
 }
 
@@ -585,14 +633,22 @@ fn optional_section(
     Ok(None)
 }
 
+fn optional_process_section(
+    sections: &HashMap<String, String>,
+    name: &'static str,
+    mode: MetricsBatchMode,
+) -> Result<Option<String>, AppError> {
+    if mode.includes_process_metrics() {
+        return required_section(sections, name).map(Some);
+    }
+
+    Ok(None)
+}
+
 fn map_openssh_connect_error(error: openssh::Error) -> AppError {
     match &error {
         openssh::Error::Connect(io) | openssh::Error::Master(io) => {
-            let code = match io.kind() {
-                ErrorKind::PermissionDenied => AppErrorCode::SshAuthFailed,
-                _ => AppErrorCode::SshConnectFailed,
-            };
-            AppError::new(code, "SSH connection failed").with_detail(io.to_string())
+            map_ssh_io_error(io, "SSH connection failed")
         }
         openssh::Error::Ssh(io) => AppError::new(
             AppErrorCode::SshConnectFailed,
@@ -602,6 +658,33 @@ fn map_openssh_connect_error(error: openssh::Error) -> AppError {
         _ => AppError::new(AppErrorCode::SshConnectFailed, "SSH connection failed")
             .with_detail(error.to_string()),
     }
+}
+
+fn map_ssh_io_error(error: &std::io::Error, fallback_message: &'static str) -> AppError {
+    let detail = error.to_string();
+    let detail_lower = detail.to_lowercase();
+
+    if detail_lower.contains("remote host identification has changed")
+        || detail_lower.contains("offending key")
+    {
+        return AppError::new(AppErrorCode::SshHostKeyChanged, "SSH host key changed")
+            .with_detail(detail);
+    }
+
+    if detail_lower.contains("no host key is known")
+        || detail_lower.contains("host key verification failed")
+        || detail_lower.contains("authenticity of host")
+        || detail_lower.contains("strict host key checking")
+    {
+        return AppError::new(AppErrorCode::SshHostKeyUnknown, "SSH host key is unknown")
+            .with_detail(detail);
+    }
+
+    let code = match error.kind() {
+        ErrorKind::PermissionDenied => AppErrorCode::SshAuthFailed,
+        _ => AppErrorCode::SshConnectFailed,
+    };
+    AppError::new(code, fallback_message).with_detail(detail)
 }
 
 fn map_openssh_command_error(error: openssh::Error) -> AppError {

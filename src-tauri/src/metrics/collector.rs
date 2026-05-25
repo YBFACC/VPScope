@@ -14,9 +14,58 @@ use crate::{
     },
     ssh::{DynSshClient, MetricsBatchMode, RemoteMetricsOutput},
 };
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-const SLOW_METRICS_REFRESH_MS: u64 = 5_000;
+const ACTIVE_SLOW_METRICS_REFRESH_MS: u64 = 15_000;
+const ACTIVE_PROCESS_REFRESH_MS: u64 = 5_000;
+const OVERVIEW_SLOW_METRICS_REFRESH_MS: u64 = 60_000;
+const TRAY_SLOW_METRICS_REFRESH_MS: u64 = 300_000;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CollectionProfile {
+    Active,
+    Overview,
+    Tray,
+}
+
+impl Default for CollectionProfile {
+    fn default() -> Self {
+        Self::Active
+    }
+}
+
+impl CollectionProfile {
+    pub fn resolve_interval_ms(self, requested: Option<u64>, host_default: u64) -> u64 {
+        match self {
+            Self::Active => requested.unwrap_or(host_default).clamp(500, 10_000),
+            Self::Overview => requested
+                .unwrap_or(host_default.max(5_000))
+                .clamp(5_000, 30_000),
+            Self::Tray => requested.unwrap_or(30_000).clamp(30_000, 300_000),
+        }
+    }
+
+    fn slow_refresh_ms(self) -> u64 {
+        match self {
+            Self::Active => ACTIVE_SLOW_METRICS_REFRESH_MS,
+            Self::Overview => OVERVIEW_SLOW_METRICS_REFRESH_MS,
+            Self::Tray => TRAY_SLOW_METRICS_REFRESH_MS,
+        }
+    }
+
+    fn process_refresh_ms(self) -> Option<u64> {
+        match self {
+            Self::Active => Some(ACTIVE_PROCESS_REFRESH_MS),
+            Self::Overview | Self::Tray => None,
+        }
+    }
+
+    fn includes_processes(self) -> bool {
+        self.process_refresh_ms().is_some()
+    }
+}
 
 #[derive(Debug, Default)]
 struct PreviousCounters {
@@ -33,6 +82,11 @@ struct CachedSlowMetrics {
     kernel: Option<String>,
     arch: Option<String>,
     disks: Vec<DiskInfo>,
+}
+
+#[derive(Debug, Clone)]
+struct CachedProcessMetrics {
+    ts: u64,
     processes: Vec<ProcessInfo>,
 }
 
@@ -40,6 +94,7 @@ struct CachedSlowMetrics {
 pub struct MetricsCollector {
     previous: Option<PreviousCounters>,
     slow: Option<CachedSlowMetrics>,
+    processes: Option<CachedProcessMetrics>,
 }
 
 impl MetricsCollector {
@@ -83,7 +138,9 @@ impl MetricsCollector {
         ts: u64,
     ) -> Result<HostSnapshot, AppError> {
         let mut collector = Self::new();
-        collector.collect(host, ssh, ts).await
+        collector
+            .collect(host, ssh, ts, CollectionProfile::Active)
+            .await
     }
 
     pub async fn collect(
@@ -91,15 +148,15 @@ impl MetricsCollector {
         host: &HostConfig,
         ssh: DynSshClient,
         ts: u64,
+        profile: CollectionProfile,
     ) -> Result<HostSnapshot, AppError> {
-        let mode = if self.needs_slow_refresh(ts) {
-            MetricsBatchMode::Full
-        } else {
-            MetricsBatchMode::Fast
-        };
+        let mode = self.next_batch_mode(ts, profile);
         let output = ssh.collect_metrics(host, mode).await?;
-        if mode == MetricsBatchMode::Full {
+        if matches!(mode, MetricsBatchMode::Slow | MetricsBatchMode::Full) {
             self.update_slow_metrics(&output, ts)?;
+        }
+        if matches!(mode, MetricsBatchMode::Process | MetricsBatchMode::Full) {
+            self.update_process_metrics(&output, ts)?;
         }
 
         let cpu_samples = parse_proc_stat(&output.proc_stat);
@@ -124,6 +181,14 @@ impl MetricsCollector {
             AppError::internal("Slow metrics cache is empty after full metrics refresh")
         })?;
         let disks = disk_rates(slow.disks.clone(), &disk_io, previous, ts);
+        let processes = if profile.includes_processes() {
+            self.processes
+                .as_ref()
+                .map(|processes| processes.processes.clone())
+                .unwrap_or_default()
+        } else {
+            Vec::new()
+        };
 
         let snapshot = HostSnapshot {
             host_id: host.id.clone(),
@@ -143,7 +208,7 @@ impl MetricsCollector {
             memory: parse_meminfo(&output.meminfo)?,
             disks,
             network,
-            processes: slow.processes.clone(),
+            processes,
         };
 
         self.previous = Some(PreviousCounters {
@@ -156,10 +221,32 @@ impl MetricsCollector {
         Ok(snapshot)
     }
 
-    fn needs_slow_refresh(&self, ts: u64) -> bool {
+    fn next_batch_mode(&self, ts: u64, profile: CollectionProfile) -> MetricsBatchMode {
+        let needs_slow = self.needs_slow_refresh(ts, profile.slow_refresh_ms());
+        let needs_process = profile
+            .process_refresh_ms()
+            .map(|refresh_ms| self.needs_process_refresh(ts, refresh_ms))
+            .unwrap_or(false);
+
+        match (needs_slow, needs_process) {
+            (true, true) => MetricsBatchMode::Full,
+            (true, false) => MetricsBatchMode::Slow,
+            (false, true) => MetricsBatchMode::Process,
+            (false, false) => MetricsBatchMode::Fast,
+        }
+    }
+
+    fn needs_slow_refresh(&self, ts: u64, refresh_ms: u64) -> bool {
         self.slow
             .as_ref()
-            .map(|slow| ts.saturating_sub(slow.ts) >= SLOW_METRICS_REFRESH_MS)
+            .map(|slow| ts.saturating_sub(slow.ts) >= refresh_ms)
+            .unwrap_or(true)
+    }
+
+    fn needs_process_refresh(&self, ts: u64, refresh_ms: u64) -> bool {
+        self.processes
+            .as_ref()
+            .map(|processes| ts.saturating_sub(processes.ts) >= refresh_ms)
             .unwrap_or(true)
     }
 
@@ -175,11 +262,7 @@ impl MetricsCollector {
         let df = output
             .df
             .as_deref()
-            .ok_or_else(|| AppError::internal("Full metrics batch did not include df output"))?;
-        let ps = output
-            .ps
-            .as_deref()
-            .ok_or_else(|| AppError::internal("Full metrics batch did not include ps output"))?;
+            .ok_or_else(|| AppError::internal("Slow metrics batch did not include df output"))?;
         let (os, kernel, arch) = parse_uname_parts(uname);
 
         self.slow = Some(CachedSlowMetrics {
@@ -188,6 +271,23 @@ impl MetricsCollector {
             kernel,
             arch,
             disks: parse_df_p(df)?,
+        });
+
+        Ok(())
+    }
+
+    fn update_process_metrics(
+        &mut self,
+        output: &RemoteMetricsOutput,
+        ts: u64,
+    ) -> Result<(), AppError> {
+        let ps = output
+            .ps
+            .as_deref()
+            .ok_or_else(|| AppError::internal("Process metrics batch did not include ps output"))?;
+
+        self.processes = Some(CachedProcessMetrics {
+            ts,
             processes: parse_ps_output(ps)?,
         });
 
@@ -373,7 +473,7 @@ mod tests {
 
     fn test_metrics_output(mode: MetricsBatchMode, call: u64) -> RemoteMetricsOutput {
         RemoteMetricsOutput {
-            uname: (mode == MetricsBatchMode::Full)
+            uname: matches!(mode, MetricsBatchMode::Slow | MetricsBatchMode::Full)
                 .then(|| "Linux vps 6.8.0-71-generic x86_64".to_string()),
             loadavg: "0.10 0.20 0.30 1/2 3".to_string(),
             uptime: "100.0 0.0".to_string(),
@@ -385,7 +485,7 @@ mod tests {
                 100 - call
             ),
             meminfo: "MemTotal: 1000 kB\nMemAvailable: 400 kB\nCached: 100 kB\nSwapTotal: 0 kB\nSwapFree: 0 kB\n".to_string(),
-            df: (mode == MetricsBatchMode::Full).then(|| {
+            df: matches!(mode, MetricsBatchMode::Slow | MetricsBatchMode::Full).then(|| {
                 "Filesystem 1024-blocks Used Available Capacity Mounted on\n/dev/vda1 1000 200 800 20% /\n".to_string()
             }),
             net_dev: format!(
@@ -398,7 +498,7 @@ mod tests {
                 call * 2,
                 call * 4
             ),
-            ps: (mode == MetricsBatchMode::Full).then(|| {
+            ps: matches!(mode, MetricsBatchMode::Process | MetricsBatchMode::Full).then(|| {
                 "PID PPID USER STAT %CPU %MEM RSS COMMAND\n1 0 root S 0.0 0.1 100 init\n"
                     .to_string()
             }),
@@ -427,16 +527,25 @@ mod tests {
         let ssh = Arc::new(RecordingSshClient::default());
         let host = test_host();
 
-        let first = collector.collect(&host, ssh.clone(), 1).await.unwrap();
-        let second = collector.collect(&host, ssh.clone(), 1_001).await.unwrap();
-        let third = collector.collect(&host, ssh.clone(), 6_001).await.unwrap();
+        let first = collector
+            .collect(&host, ssh.clone(), 1, CollectionProfile::Active)
+            .await
+            .unwrap();
+        let second = collector
+            .collect(&host, ssh.clone(), 1_001, CollectionProfile::Active)
+            .await
+            .unwrap();
+        let third = collector
+            .collect(&host, ssh.clone(), 6_001, CollectionProfile::Active)
+            .await
+            .unwrap();
 
         assert_eq!(
             *ssh.modes.lock().unwrap(),
             vec![
                 MetricsBatchMode::Full,
                 MetricsBatchMode::Fast,
-                MetricsBatchMode::Full
+                MetricsBatchMode::Process
             ]
         );
         assert_eq!(first.processes.len(), 1);
@@ -444,6 +553,29 @@ mod tests {
         assert_eq!(third.processes.len(), 1);
         assert_eq!(second.disks[0].read_bytes_per_sec, Some(1_024.0));
         assert_eq!(second.disks[0].write_bytes_per_sec, Some(2_048.0));
+    }
+
+    #[tokio::test]
+    async fn overview_profile_skips_process_batches() {
+        let mut collector = MetricsCollector::new();
+        let ssh = Arc::new(RecordingSshClient::default());
+        let host = test_host();
+
+        let first = collector
+            .collect(&host, ssh.clone(), 1, CollectionProfile::Overview)
+            .await
+            .unwrap();
+        let second = collector
+            .collect(&host, ssh.clone(), 10_001, CollectionProfile::Overview)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            *ssh.modes.lock().unwrap(),
+            vec![MetricsBatchMode::Slow, MetricsBatchMode::Fast]
+        );
+        assert!(first.processes.is_empty());
+        assert!(second.processes.is_empty());
     }
 
     #[tokio::test]

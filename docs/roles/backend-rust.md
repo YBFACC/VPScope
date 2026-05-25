@@ -330,22 +330,23 @@ ps -eo pid,ppid,user,stat,pcpu,pmem,rss,args
 
 ### Step 8: 实现 Metrics Collector
 
-Collector 负责合成一次完整 `HostSnapshot`，但采集分快慢两层：
+Collector 负责合成一次完整 `HostSnapshot`，但采集按 profile 和批量模式分层：
 
 1. 快路径每个刷新周期读取 `/proc/loadavg`、`/proc/uptime`、`/proc/stat`、`/proc/meminfo`、`/proc/net/dev`、`/proc/diskstats`。
 2. 读取 CPU 原始计数并计算差值。
 3. 读取内存。
 4. 读取磁盘 IO 累计值并计算速率。
 5. 读取网络累计值并计算速率。
-6. 慢路径首次采集和约每 5 秒刷新一次 `uname`、`df -P`、`ps`。
-7. 快路径复用最近一次慢路径缓存的系统静态信息、磁盘容量和进程列表。
-8. 合成 `HostSnapshot`。
+6. 慢路径按 profile 低频刷新 `uname`、`df -P`，并复用系统静态信息和磁盘容量。
+7. 进程路径只在 `active` profile 按需刷新 `ps`；`overview` 和 `tray` 不采集进程列表。
+8. 合成 `HostSnapshot`，并把最近一次成功 snapshot 缓存在内存中供 `metrics_last_snapshot` 读取。
 
 采集执行要求：
 
-- 快路径和慢路径都通过 `SshClient::collect_metrics` 的固定批量命令执行，避免一个刷新周期内串行发出多条 SSH command。
-- 首次采集必须使用慢路径，保证 snapshot 有系统信息、磁盘容量和进程列表。
-- 在 500ms 刷新间隔下，不能每帧运行 `ps` 或 `df -P`。
+- 快路径、慢路径和进程路径都通过 `SshClient::collect_metrics` 的固定批量命令执行，避免一个刷新周期内串行发出多条 SSH command。
+- 首次 `active` 采集必须使用 full batch，保证 snapshot 有系统信息、磁盘容量和进程列表。
+- 首次 `overview`/`tray` 采集只需要 slow batch，不运行 `ps`。
+- 在高频刷新间隔下，不能每帧运行 `ps`、`df -P` 或 `uname`。
 - `/proc/diskstats` 速率按累计 sector 差值计算，默认 sector size 为 512 bytes。
 
 建议结构：
@@ -375,18 +376,26 @@ impl MetricsCollector {
 
 - 创建 subscription id。
 - 启动后台任务。
-- 按 interval 调用 collector。
+- 按 `CollectionProfile` 解析 interval 并调用 collector。
 - 通过 `metrics://snapshot` 推送。
 - 失败时通过 `metrics://error` 推送。
 
 `metrics_unsubscribe`：
 
 - 根据 subscription id 取消任务。
-- 如果该 host 没有其他订阅，可以释放或闲置 SSH session。
+- 如果该 host 没有其他订阅，安排 idle timeout 后释放 SSH session。
+
+`metrics_last_snapshot`：
+
+- 返回后端内存中最近一次成功采集的 `HostSnapshot`。
+- 没有缓存时返回 `null`。
+- 用于前端打开窗口或切换 host 时先显示最近状态。
 
 实现要求：
 
-- 刷新间隔限制在 500ms 到 10000ms。
+- `active` 刷新间隔限制在 500ms 到 10000ms。
+- `overview` 刷新间隔限制在 5000ms 到 30000ms。
+- `tray` 刷新间隔限制在 30000ms 到 300000ms。
 - 后台任务必须可取消。
 - app 退出时停止所有任务。
 - 不要把同一个 host 的多个面板变成多个采集循环。

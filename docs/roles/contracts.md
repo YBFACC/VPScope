@@ -136,6 +136,20 @@ export type HostSnapshot = {
   processes: ProcessInfo[];
 };
 
+export type CollectionProfile = "active" | "overview" | "tray";
+
+export type MetricsSubscribePayload = {
+  hostId: HostId;
+  intervalMs?: number;
+  profile?: CollectionProfile;
+};
+
+export type MetricsLastSnapshotPayload = {
+  hostId: HostId;
+};
+
+export type MetricsLastSnapshotResult = HostSnapshot | null;
+
 export type TrayItemDisplayMode = "text" | "rings";
 
 export type TraySettingsItem = {
@@ -286,11 +300,20 @@ type HostTestConnectionResult = {
 请求：
 
 ```ts
+type CollectionProfile = "active" | "overview" | "tray";
+
 type MetricsSubscribePayload = {
   hostId: HostId;
   intervalMs?: number;
+  profile?: CollectionProfile;
 };
 ```
+
+`profile` 用于控制采集成本：
+
+- `active`：当前详情页，默认使用 host 的 `refreshIntervalMs`，限制在 500ms 到 10000ms，并按需采集进程列表。
+- `overview`：多 host 总览，限制在 5000ms 到 30000ms，不采集进程列表。
+- `tray`：窗口隐藏或菜单栏展示，限制在 30000ms 到 300000ms，不采集进程列表。
 
 响应：
 
@@ -298,6 +321,24 @@ type MetricsSubscribePayload = {
 type MetricsSubscribeResult = {
   subscriptionId: string;
 };
+```
+
+### `metrics_last_snapshot`
+
+用途：读取后端内存中最近一次成功采集的 snapshot。用于打开窗口或切换 host 时先显示最近状态，再等待实时订阅刷新。没有缓存时返回 `null`。
+
+请求：
+
+```ts
+type MetricsLastSnapshotPayload = {
+  hostId: HostId;
+};
+```
+
+响应：
+
+```ts
+type MetricsLastSnapshotResult = HostSnapshot | null;
 ```
 
 ### `metrics_unsubscribe`
@@ -409,8 +450,9 @@ HostSnapshot
 
 触发频率：
 
-- 默认每 2000ms。
-- 用户可在 500ms 到 10000ms 之间配置。
+- `active` 默认使用 host 的 `refreshIntervalMs`，限制在 500ms 到 10000ms。
+- `overview` 默认不低于 5000ms，限制在 5000ms 到 30000ms。
+- `tray` 默认 30000ms，限制在 30000ms 到 300000ms。
 
 ### `metrics://error`
 

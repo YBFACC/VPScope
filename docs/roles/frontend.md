@@ -169,7 +169,8 @@ export type VPScopeClient = {
   updateHost(payload: HostUpdatePayload): Promise<HostConfig>;
   deleteHost(id: HostId): Promise<void>;
   testConnection(payload: HostTestConnectionPayload): Promise<HostTestConnectionResult>;
-  subscribeMetrics(hostId: HostId, onSnapshot: MetricsSnapshotHandler): Promise<() => Promise<void>>;
+  getLastSnapshot(hostId: HostId): Promise<HostSnapshot | null>;
+  subscribeMetrics(payload: MetricsSubscribePayload, onSnapshot: MetricsSnapshotHandler): Promise<() => Promise<void>>;
   listProcesses(payload: ProcessListPayload): Promise<ProcessInfo[]>;
 };
 ```
@@ -370,11 +371,12 @@ Host 管理界面包含：
 
 ### Step 9: 接入实时指标
 
-1. 用户选中 host 后调用 `subscribeMetrics`。
-2. 收到 snapshot 后写入 `metricsStore`。
-3. Dashboard panel 从 store 读取数据。
-4. 切换 host 或卸载页面时取消订阅。
-5. 发生 `metrics://error` 时保留上一次有效数据，并显示错误状态。
+1. 用户选中 host 后先调用 `getLastSnapshot` 显示最近状态，再用 `subscribeMetrics({ hostId, profile: "active" })` 订阅实时指标。
+2. 总览页用 `profile: "overview"` 订阅多 host，窗口隐藏或仅菜单栏监控时用 `profile: "tray"`。
+3. 收到 snapshot 后写入 `metricsStore`。
+4. Dashboard panel 从 store 读取数据。
+5. 切换 host、窗口隐藏或卸载页面时取消不需要的高频订阅。
+6. 发生 `metrics://error` 时保留上一次有效数据，并显示错误状态。
 
 验收：
 
@@ -406,4 +408,3 @@ Host 管理界面包含：
 - 连接错误、认证错误、host key 问题都有 UI。
 - 进程表数据量较大时滚动流畅。
 - TypeScript 无错误。
-

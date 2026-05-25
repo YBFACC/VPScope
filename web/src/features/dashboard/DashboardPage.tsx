@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { EmptyState } from "@/components/empty/EmptyState";
 import { TopToolbar } from "@/components/toolbar/TopToolbar";
 import { HostSidebar } from "@/features/hosts/HostSidebar";
@@ -22,6 +22,9 @@ import { NetworkPanel } from "./NetworkPanel";
 import { ProcessPanel } from "./ProcessPanel";
 
 export function DashboardPage() {
+  const [isWindowVisible, setIsWindowVisible] = useState(
+    () => typeof document === "undefined" || document.visibilityState !== "hidden",
+  );
   const loadHosts = useHostStore((state) => state.loadHosts);
   const isLoadingHosts = useHostStore((state) => state.isLoading);
   const hosts = useHostStore((state) => state.hosts);
@@ -86,9 +89,28 @@ export function DashboardPage() {
   }, [ingestMetricsError, setConnectionState]);
 
   useEffect(() => {
+    function onVisibilityChange() {
+      setIsWindowVisible(document.visibilityState !== "hidden");
+    }
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, []);
+
+  useEffect(() => {
+    const trayIds = trayHostIds(traySettings);
+
+    if (!isWindowVisible) {
+      void clearSubscription();
+      void subscribeToHosts(trayIds, "tray");
+      return () => {
+        void clearOverviewSubscriptions();
+      };
+    }
+
     if (isOverview) {
       void clearSubscription();
-      void subscribeToHosts(hosts.map((host) => host.id));
+      void subscribeToHosts(hosts.map((host) => host.id), "overview");
       return () => {
         void clearOverviewSubscriptions();
       };
@@ -98,12 +120,12 @@ export function DashboardPage() {
 
     if (!selectedHostId) {
       void clearSubscription();
-      void subscribeToHosts(trayHostIds(traySettings));
+      void subscribeToHosts(trayIds, "tray");
       return;
     }
 
     void subscribeToHost(selectedHostId);
-    void subscribeToHosts(trayHostIds(traySettings).filter((hostId) => hostId !== selectedHostId));
+    void subscribeToHosts(trayIds.filter((hostId) => hostId !== selectedHostId), "tray");
 
     return () => {
       void clearSubscription();
@@ -117,6 +139,7 @@ export function DashboardPage() {
     subscribeToHosts,
     traySettings,
     isOverview,
+    isWindowVisible,
   ]);
 
   useEffect(() => {

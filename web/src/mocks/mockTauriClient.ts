@@ -139,13 +139,20 @@ export function createMockTauriClient(): VPScopeClient {
         fingerprint: "SHA256:mockedHostKeyFingerprintvpscope",
       };
     },
-    async subscribeMetrics(hostId, onSnapshot) {
+    async getLastSnapshot(hostId) {
+      await wait(40);
+      return createMockSnapshot(hostId);
+    },
+    async subscribeMetrics(payload, onSnapshot) {
       await wait(80);
+      const { hostId } = payload;
       onSnapshot(createMockSnapshot(hostId));
       const host = hosts.find((candidate) => candidate.id === hostId);
+      const profileInterval =
+        payload.profile === "tray" ? 30_000 : payload.profile === "overview" ? 5_000 : undefined;
       const interval = window.setInterval(() => {
         onSnapshot(createMockSnapshot(hostId));
-      }, host?.refreshIntervalMs ?? 2_000);
+      }, payload.intervalMs ?? profileInterval ?? host?.refreshIntervalMs ?? 2_000);
 
       return async () => {
         window.clearInterval(interval);

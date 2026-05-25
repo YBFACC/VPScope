@@ -149,15 +149,19 @@ uname              系统基础信息
 MVP 当前保留系统 OpenSSH 路径以兼容用户现有 `~/.ssh/config`、key 和 agent，但运行时必须降低连接和命令开销：
 
 - 使用 `openssh` 的 `native-mux`，通过 OpenSSH control master 维持连接，并用 native mux socket 执行后续 command。
-- 按 host 复用 SSH session；host 配置变化、连接中断或最后一个订阅取消时释放缓存 session。
+- 按 host 复用 SSH session；host 配置变化、连接中断或最后一个订阅取消后进入 idle timeout，再释放缓存 session。
+- 默认使用严格 known_hosts 校验；未知或变化的 host key 返回结构化错误，由用户显式确认后再写入 known_hosts。
 - 指标刷新使用后端固定批量脚本，不把前端输入拼进远程 shell。
 - 快路径每个刷新周期读取 `/proc/loadavg`、`/proc/uptime`、`/proc/stat`、`/proc/meminfo`、`/proc/net/dev`、`/proc/diskstats`。
-- 慢路径首次和约每 5 秒刷新 `uname`、`df -P`、`ps`，其它帧复用缓存，避免 500ms 刷新时反复扫进程表和文件系统。
+- 慢路径按 profile 低频刷新 `uname` 和 `df -P`，其它帧复用缓存。
+- 进程列表只在当前详情页 `active` profile 刷新；总览和菜单栏 `overview`/`tray` profile 不运行 `ps`。
+- 最近一次成功 snapshot 缓存在后端内存中，前端打开窗口或切换 host 时先读取缓存，再等待实时刷新。
 
 前端不传任意 shell 字符串，只传结构化动作：
 
 ```ts
-invoke("metrics_subscribe", { hostId, intervalMs });
+invoke("metrics_last_snapshot", { hostId });
+invoke("metrics_subscribe", { hostId, intervalMs, profile: "active" });
 invoke("process_list", { hostId, sortBy: "cpu", limit: 200 });
 ```
 
@@ -382,6 +386,7 @@ host_create
 host_update
 host_delete
 host_test_connection
+metrics_last_snapshot
 metrics_subscribe
 metrics_unsubscribe
 process_list
@@ -394,8 +399,10 @@ settings_update
 ## 性能策略
 
 - SSH session 按 host 复用，不为每个面板新建连接。
-- 默认刷新间隔 2000ms，可调 500ms-10000ms。
-- 进程列表和磁盘 IO 可比 CPU/内存低频刷新。
+- 采集分 `active`、`overview`、`tray` 三档：详情页 500ms-10000ms，总览 5000ms-30000ms，菜单栏/隐藏窗口 30000ms-300000ms。
+- 进程列表只在 `active` profile 刷新，避免长期静默或总览页反复运行 `ps`。
+- 后端保留 last-known snapshot，窗口打开时先显示最近状态。
+- 最后一个订阅取消后延迟释放 SSH session，兼顾快速重新打开和长期静默低资源。
 - 采集任务和 UI 刷新解耦。
 - 高频历史数据使用 ring buffer。
 - React 组件按 panel 拆分，避免全 dashboard 每秒重渲染。

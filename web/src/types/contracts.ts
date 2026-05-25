@@ -107,10 +107,19 @@ export type HostTestConnectionResult = {
   fingerprint?: string;
 };
 
+export type CollectionProfile = "active" | "overview" | "tray";
+
 export type MetricsSubscribePayload = {
   hostId: HostId;
   intervalMs?: number;
+  profile?: CollectionProfile;
 };
+
+export type MetricsLastSnapshotPayload = {
+  hostId: HostId;
+};
+
+export type MetricsLastSnapshotResult = HostSnapshot | null;
 
 export type MetricsSubscribeResult = {
   subscriptionId: string;
@@ -221,6 +230,7 @@ export type VpscopeCommandPayloads = {
   host_delete: HostDeletePayload;
   host_ssh_config_list: Record<string, never>;
   host_test_connection: HostTestConnectionPayload;
+  metrics_last_snapshot: MetricsLastSnapshotPayload;
   metrics_subscribe: MetricsSubscribePayload;
   metrics_unsubscribe: MetricsUnsubscribePayload;
   process_list: ProcessListPayload;
@@ -235,6 +245,7 @@ export type VpscopeCommandResults = {
   host_delete: HostDeleteResult;
   host_ssh_config_list: SshConfigHost[];
   host_test_connection: HostTestConnectionResult;
+  metrics_last_snapshot: MetricsLastSnapshotResult;
   metrics_subscribe: MetricsSubscribeResult;
   metrics_unsubscribe: MetricsUnsubscribeResult;
   process_list: ProcessListResult;

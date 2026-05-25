@@ -13,8 +13,8 @@ pub fn run() {
     use app_state::AppState;
     use commands::{
         health_check, host_create, host_delete, host_list, host_ssh_config_list,
-        host_test_connection, host_update, metrics_subscribe, metrics_unsubscribe, process_list,
-        tray_settings_get, tray_settings_update,
+        host_test_connection, host_update, metrics_last_snapshot, metrics_subscribe,
+        metrics_unsubscribe, process_list, tray_settings_get, tray_settings_update,
     };
     use tauri::Manager;
     use tray::setup_tray;
@@ -34,6 +34,7 @@ pub fn run() {
             host_delete,
             host_ssh_config_list,
             host_test_connection,
+            metrics_last_snapshot,
             metrics_subscribe,
             metrics_unsubscribe,
             process_list,

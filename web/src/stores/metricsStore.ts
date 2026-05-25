@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { pushHistory, type HistoryPoint } from "@/lib/historyBuffer";
 import { runClient, tauriClient } from "@/lib/tauriClient";
-import type { AppError, HostId, HostSnapshot, MetricsErrorEvent } from "@/types/contracts";
+import type { AppError, CollectionProfile, HostId, HostSnapshot, MetricsErrorEvent } from "@/types/contracts";
 
 type MetricHistory = {
   cpu: Array<HistoryPoint<number>>;
@@ -14,13 +14,13 @@ type MetricsStore = {
   snapshots: Record<HostId, HostSnapshot | undefined>;
   histories: Record<HostId, MetricHistory | undefined>;
   activeHostId?: HostId;
-  overviewUnsubscribes: Record<HostId, (() => Promise<void>) | undefined>;
+  overviewUnsubscribes: Record<HostId, { profile: CollectionProfile; unsubscribe: () => Promise<void> } | undefined>;
   isSubscribing: boolean;
   error?: AppError;
   errorsByHost: Record<HostId, AppError | undefined>;
   unsubscribe?: () => Promise<void>;
   subscribeToHost: (hostId: HostId) => Promise<void>;
-  subscribeToHosts: (hostIds: HostId[]) => Promise<void>;
+  subscribeToHosts: (hostIds: HostId[], profile?: CollectionProfile) => Promise<void>;
   clearSubscription: () => Promise<void>;
   clearOverviewSubscriptions: () => Promise<void>;
   ingestSnapshot: (snapshot: HostSnapshot) => void;
@@ -39,7 +39,8 @@ const emptyHistory = (): MetricHistory => ({
 
 function nextHistory(previous: MetricHistory | undefined, snapshot: HostSnapshot) {
   const history = previous ?? emptyHistory();
-  const memoryPercent = (snapshot.memory.usedBytes / snapshot.memory.totalBytes) * 100;
+  const memoryPercent =
+    snapshot.memory.totalBytes > 0 ? (snapshot.memory.usedBytes / snapshot.memory.totalBytes) * 100 : 0;
   const network = snapshot.network[0];
 
   return {
@@ -67,22 +68,28 @@ export const useMetricsStore = create<MetricsStore>((set, get) => ({
     set({ activeHostId: hostId, unsubscribe: undefined, isSubscribing: true, error: undefined });
 
     try {
-      const unsubscribe = await runClient(() => tauriClient.subscribeMetrics(hostId, get().ingestSnapshot));
+      const lastSnapshot = await runClient(() => tauriClient.getLastSnapshot(hostId));
+      if (lastSnapshot) {
+        get().ingestSnapshot(lastSnapshot);
+      }
+      const unsubscribe = await runClient(() =>
+        tauriClient.subscribeMetrics({ hostId, profile: "active" }, get().ingestSnapshot),
+      );
       set({ unsubscribe, isSubscribing: false });
     } catch (error) {
       set({ error: error as AppError, isSubscribing: false });
     }
   },
-  async subscribeToHosts(hostIds) {
+  async subscribeToHosts(hostIds, profile = "overview") {
     const uniqueHostIds = Array.from(new Set(hostIds));
     const current = get();
     const wanted = new Set(uniqueHostIds);
 
     await Promise.all(
       Object.entries(current.overviewUnsubscribes)
-        .filter(([hostId]) => !wanted.has(hostId))
-        .map(async ([hostId, unsubscribe]) => {
-          await unsubscribe?.();
+        .filter(([hostId, subscription]) => !wanted.has(hostId) || subscription?.profile !== profile)
+        .map(async ([hostId, subscription]) => {
+          await subscription?.unsubscribe();
           set((state) => {
             const { [hostId]: _deleted, ...overviewUnsubscribes } = state.overviewUnsubscribes;
             return { overviewUnsubscribes };
@@ -101,11 +108,20 @@ export const useMetricsStore = create<MetricsStore>((set, get) => ({
     await Promise.all(
       missingHostIds.map(async (hostId) => {
         try {
-          const unsubscribe = await runClient(() => tauriClient.subscribeMetrics(hostId, get().ingestSnapshot));
+          const lastSnapshot = await runClient(() => tauriClient.getLastSnapshot(hostId));
+          if (lastSnapshot) {
+            get().ingestSnapshot(lastSnapshot);
+          }
+          const unsubscribe = await runClient(() =>
+            tauriClient.subscribeMetrics({ hostId, profile }, get().ingestSnapshot),
+          );
           set((state) => ({
             overviewUnsubscribes: {
               ...state.overviewUnsubscribes,
-              [hostId]: unsubscribe,
+              [hostId]: {
+                profile,
+                unsubscribe,
+              },
             },
           }));
         } catch (error) {
@@ -128,7 +144,7 @@ export const useMetricsStore = create<MetricsStore>((set, get) => ({
   },
   async clearOverviewSubscriptions() {
     const unsubscribes = Object.values(get().overviewUnsubscribes);
-    await Promise.all(unsubscribes.map((unsubscribe) => unsubscribe?.()));
+    await Promise.all(unsubscribes.map((subscription) => subscription?.unsubscribe()));
     set({ overviewUnsubscribes: {}, isSubscribing: false });
   },
   async removeHostData(hostId) {
@@ -138,7 +154,7 @@ export const useMetricsStore = create<MetricsStore>((set, get) => ({
       await state.unsubscribe?.();
     }
 
-    await state.overviewUnsubscribes[hostId]?.();
+    await state.overviewUnsubscribes[hostId]?.unsubscribe();
 
     set((current) => {
       const { [hostId]: _deletedSnapshot, ...snapshots } = current.snapshots;

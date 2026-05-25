@@ -5,7 +5,10 @@ use crate::{
         ConnectionStatus, HostConnectionState, HOST_CONNECTION_STATE, METRICS_ERROR,
         METRICS_SNAPSHOT,
     },
-    metrics::{collector::MetricsCollector, snapshot::HostSnapshot},
+    metrics::{
+        collector::{CollectionProfile, MetricsCollector},
+        snapshot::HostSnapshot,
+    },
     ssh::DynSshClient,
     tray::TrayState,
 };
@@ -18,6 +21,8 @@ use std::{
 use tauri::{AppHandle, Emitter};
 use tokio::task::JoinHandle;
 use uuid::Uuid;
+
+const SSH_IDLE_DISCONNECT_MS: u64 = 300_000;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -33,6 +38,8 @@ struct SubscriptionTask {
 
 pub struct MetricsScheduler {
     subscriptions: RwLock<HashMap<String, SubscriptionTask>>,
+    idle_disconnects: RwLock<HashMap<String, JoinHandle<()>>>,
+    snapshots: Arc<RwLock<HashMap<String, HostSnapshot>>>,
     tray_state: Arc<TrayState>,
 }
 
@@ -40,6 +47,8 @@ impl MetricsScheduler {
     pub fn new(tray_state: Arc<TrayState>) -> Self {
         Self {
             subscriptions: RwLock::new(HashMap::new()),
+            idle_disconnects: RwLock::new(HashMap::new()),
+            snapshots: Arc::new(RwLock::new(HashMap::new())),
             tray_state,
         }
     }
@@ -50,16 +59,21 @@ impl MetricsScheduler {
         ssh: DynSshClient,
         app: AppHandle,
         interval_ms: Option<u64>,
+        profile: CollectionProfile,
     ) -> Result<MetricsSubscribeResult, AppError> {
         let subscription_id = Uuid::new_v4().to_string();
         let host_id = host.id.clone();
-        let interval =
-            Duration::from_millis(resolve_interval_ms(interval_ms, host.refresh_interval_ms));
+        self.cancel_idle_disconnect(&host_id)?;
+        let interval = Duration::from_millis(
+            profile.resolve_interval_ms(interval_ms, host.refresh_interval_ms),
+        );
         let handle = tokio::spawn(run_subscription_loop(
             host,
             ssh,
             app,
             interval,
+            profile,
+            Arc::clone(&self.snapshots),
             self.tray_state.clone(),
         ));
 
@@ -100,8 +114,91 @@ impl MetricsScheduler {
         Ok(None)
     }
 
+    pub fn latest_snapshot(&self, host_id: &str) -> Result<Option<HostSnapshot>, AppError> {
+        Ok(self
+            .snapshots
+            .read()
+            .map_err(|_| AppError::internal("Metrics snapshot cache lock is poisoned"))?
+            .get(host_id)
+            .cloned())
+    }
+
+    pub fn schedule_idle_disconnect(
+        self: &Arc<Self>,
+        host_id: String,
+        ssh: DynSshClient,
+        app: AppHandle,
+    ) -> Result<(), AppError> {
+        self.cancel_idle_disconnect(&host_id)?;
+
+        let scheduler = Arc::clone(self);
+        let task_host_id = host_id.clone();
+        let handle = tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(SSH_IDLE_DISCONNECT_MS)).await;
+
+            if scheduler
+                .host_has_subscriptions(&task_host_id)
+                .unwrap_or(true)
+            {
+                let _ = scheduler.remove_idle_disconnect(&task_host_id);
+                return;
+            }
+
+            let _ = ssh.disconnect_host(&task_host_id);
+            let _ = scheduler.remove_idle_disconnect(&task_host_id);
+            emit_connection_state(
+                &app,
+                HostConnectionState {
+                    host_id: task_host_id,
+                    status: ConnectionStatus::Disconnected,
+                    message: Some("SSH session closed after idle timeout".to_string()),
+                    latency_ms: None,
+                    last_connected_at: None,
+                    last_error: None,
+                },
+            );
+        });
+
+        self.idle_disconnects
+            .write()
+            .map_err(|_| AppError::internal("Idle disconnect lock is poisoned"))?
+            .insert(host_id, handle);
+
+        Ok(())
+    }
+
     pub fn snapshot_ts(&self) -> u64 {
         unix_ms()
+    }
+
+    fn cancel_idle_disconnect(&self, host_id: &str) -> Result<(), AppError> {
+        if let Some(handle) = self
+            .idle_disconnects
+            .write()
+            .map_err(|_| AppError::internal("Idle disconnect lock is poisoned"))?
+            .remove(host_id)
+        {
+            handle.abort();
+        }
+
+        Ok(())
+    }
+
+    fn remove_idle_disconnect(&self, host_id: &str) -> Result<(), AppError> {
+        self.idle_disconnects
+            .write()
+            .map_err(|_| AppError::internal("Idle disconnect lock is poisoned"))?
+            .remove(host_id);
+        Ok(())
+    }
+
+    fn host_has_subscriptions(&self, host_id: &str) -> Result<bool, AppError> {
+        Ok(self
+            .subscriptions
+            .read()
+            .map_err(|_| AppError::internal("Metrics scheduler lock is poisoned"))?
+            .values()
+            .any(|subscription| subscription.host_id == host_id))
     }
 }
 
@@ -120,6 +217,8 @@ async fn run_subscription_loop(
     ssh: DynSshClient,
     app: AppHandle,
     interval: Duration,
+    profile: CollectionProfile,
+    snapshots: Arc<RwLock<HashMap<String, HostSnapshot>>>,
     tray_state: Arc<TrayState>,
 ) {
     let mut collector = MetricsCollector::new();
@@ -137,9 +236,12 @@ async fn run_subscription_loop(
 
     loop {
         let ts = unix_ms();
-        match collector.collect(&host, ssh.clone(), ts).await {
+        match collector.collect(&host, ssh.clone(), ts, profile).await {
             Ok(snapshot) => {
                 let host_id = snapshot.host_id.clone();
+                if let Ok(mut cache) = snapshots.write() {
+                    cache.insert(host_id.clone(), snapshot.clone());
+                }
                 tray_state.update_snapshot(&snapshot);
                 let _ = app.emit(METRICS_SNAPSHOT, snapshot);
                 emit_connection_state(
@@ -179,10 +281,6 @@ async fn run_subscription_loop(
 
         tokio::time::sleep(interval).await;
     }
-}
-
-fn resolve_interval_ms(requested: Option<u64>, host_default: u64) -> u64 {
-    requested.unwrap_or(host_default).clamp(500, 10_000)
 }
 
 fn emit_connection_state(app: &AppHandle, state: HostConnectionState) {

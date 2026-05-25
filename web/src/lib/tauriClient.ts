@@ -12,6 +12,7 @@ import type {
   HostTestConnectionResult,
   HostUpdatePayload,
   MetricsErrorEvent,
+  MetricsSubscribePayload,
   ProcessInfo,
   ProcessListPayload,
   SshConfigHost,
@@ -29,7 +30,8 @@ export type VPScopeClient = {
   updateHost(payload: HostUpdatePayload): Promise<HostConfig>;
   deleteHost(id: HostId): Promise<void>;
   testConnection(payload: HostTestConnectionPayload): Promise<HostTestConnectionResult>;
-  subscribeMetrics(hostId: HostId, onSnapshot: MetricsSnapshotHandler): Promise<() => Promise<void>>;
+  getLastSnapshot(hostId: HostId): Promise<HostSnapshot | null>;
+  subscribeMetrics(payload: MetricsSubscribePayload, onSnapshot: MetricsSnapshotHandler): Promise<() => Promise<void>>;
   listenMetricsErrors(onError: MetricsErrorHandler): Promise<() => void>;
   listenHostConnectionStates(onState: HostConnectionStateHandler): Promise<() => void>;
   listProcesses(payload: ProcessListPayload): Promise<ProcessInfo[]>;
@@ -69,10 +71,13 @@ function createTauriClient(): VPScopeClient {
     async testConnection(payload) {
       return invoke<HostTestConnectionResult>("host_test_connection", payload);
     },
-    async subscribeMetrics(hostId, onSnapshot) {
-      const result = await invoke<{ subscriptionId: string }>("metrics_subscribe", { hostId });
+    async getLastSnapshot(hostId) {
+      return invoke<HostSnapshot | null>("metrics_last_snapshot", { hostId });
+    },
+    async subscribeMetrics(payload, onSnapshot) {
+      const result = await invoke<{ subscriptionId: string }>("metrics_subscribe", payload);
       const unlisten = await listen<HostSnapshot>("metrics://snapshot", (event) => {
-        if (event.payload.hostId === hostId) {
+        if (event.payload.hostId === payload.hostId) {
           onSnapshot(event.payload);
         }
       });
