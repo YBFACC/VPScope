@@ -12,7 +12,7 @@ import { useUiStore } from "@/stores/uiStore";
 import { themePresets, type ThemeId } from "@/theme/presets";
 import type { HostConfig, TrayItemDisplayMode, TraySettings } from "@/types/contracts";
 
-type SettingsSection = "appearance" | "menuBar" | "runtime";
+type SettingsSection = "appearance" | "menuBar";
 
 export function SettingsPage() {
   const settingsOpen = useUiStore((state) => state.settingsOpen);
@@ -99,7 +99,7 @@ export function SettingsPage() {
         </div>
         <div className="grid min-h-0 border-t border-[var(--color-border)] md:grid-cols-[180px_minmax(0,1fr)]">
           <nav className="flex gap-1 border-b border-[var(--color-border)] bg-[var(--color-panel-muted)] p-2 md:grid md:border-b-0 md:border-r">
-            {(["appearance", "menuBar", "runtime"] as const).map((candidate) => (
+            {(["appearance", "menuBar"] as const).map((candidate) => (
               <button
                 key={candidate}
                 type="button"
@@ -107,7 +107,7 @@ export function SettingsPage() {
                 className="h-9 rounded-[var(--radius-control)] px-3 text-left font-mono text-xs text-[var(--color-text-muted)] hover:bg-[var(--color-row-hover)] data-[active=true]:bg-[var(--color-input)] data-[active=true]:text-[var(--color-text)]"
                 data-active={candidate === section}
               >
-                {candidate === "appearance" ? t("appearance") : candidate === "menuBar" ? t("menuBar") : t("runtime")}
+                {candidate === "appearance" ? t("appearance") : t("menuBar")}
               </button>
             ))}
           </nav>
@@ -156,7 +156,7 @@ export function SettingsPage() {
                   </div>
                 </SettingsGroup>
               </div>
-            ) : section === "menuBar" ? (
+            ) : (
               <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-3 font-mono text-xs">
                 <div className="text-[var(--color-text-muted)]">{t("menuBarSettingsHint")}</div>
 
@@ -227,15 +227,6 @@ export function SettingsPage() {
                     {isSavingTraySettings ? t("saving") : t("save")}
                   </button>
                 </div>
-              </div>
-            ) : (
-              <div className="grid gap-3 font-mono text-xs">
-                <InfoBlock title="VPScope" text={t("settingsMode")} />
-                <InfoBlock
-                  title={t("hosts")}
-                  text={`${t("hostsConfigured", { count: hosts.length })} · ${t("readOnlyNotice")}`}
-                />
-                <InfoBlock title={t("status")} text={t("settingsErrorStates")} muted />
               </div>
             )}
           </div>

@@ -34,6 +34,7 @@ export function DashboardPage() {
   const connectionStates = useHostStore((state) => state.connectionStates);
   const selectHost = useHostStore((state) => state.selectHost);
   const setConnectionState = useHostStore((state) => state.setConnectionState);
+  const setHostsDisconnected = useHostStore((state) => state.setHostsDisconnected);
   const subscribeToHost = useMetricsStore((state) => state.subscribeToHost);
   const subscribeToHosts = useMetricsStore((state) => state.subscribeToHosts);
   const clearSubscription = useMetricsStore((state) => state.clearSubscription);
@@ -68,7 +69,16 @@ export function DashboardPage() {
     void runClient(async () => {
       const [unlistenErrors, unlistenConnections] = await Promise.all([
         tauriClient.listenMetricsErrors(ingestMetricsError),
-        tauriClient.listenHostConnectionStates(setConnectionState),
+        tauriClient.listenHostConnectionStates((state) => {
+          const { selectedHostId } = useHostStore.getState();
+          const { viewMode } = useUiStore.getState();
+
+          if (viewMode === "list" && state.hostId !== selectedHostId) {
+            return;
+          }
+
+          setConnectionState(state);
+        }),
       ]);
 
       if (disposed) {
@@ -120,12 +130,12 @@ export function DashboardPage() {
 
     if (!selectedHostId) {
       void clearSubscription();
-      void subscribeToHosts(trayIds, "tray");
+      setHostsDisconnected(hosts.map((host) => host.id));
       return;
     }
 
     void subscribeToHost(selectedHostId);
-    void subscribeToHosts(trayIds.filter((hostId) => hostId !== selectedHostId), "tray");
+    setHostsDisconnected(hosts.map((host) => host.id).filter((hostId) => hostId !== selectedHostId));
 
     return () => {
       void clearSubscription();
@@ -135,6 +145,7 @@ export function DashboardPage() {
     clearSubscription,
     hosts,
     selectedHostId,
+    setHostsDisconnected,
     subscribeToHost,
     subscribeToHosts,
     traySettings,

@@ -486,13 +486,14 @@ settings_update
 ### Milestone 5: 打包和测试
 
 - macOS app icon、bundle metadata。
+- GitHub release 产物需要签名；正式分发需要 Developer ID 签名和 Apple notarization。
 - 基础单元测试：parser、数据转换、theme。
 - SSH mock/integration test。
 - 打包产物验证。
 
 验收：
 
-- 可生成可安装的 macOS app。
+- 可生成可安装的 macOS app；正式下载包通过 Gatekeeper 验证。
 - 主要 parser 有测试覆盖。
 
 ## 推荐初始化命令

@@ -54,29 +54,26 @@ export function TopToolbar() {
         <button
           type="button"
           onClick={() => setSettingsOpen(true)}
-          className="control-button grid h-8 w-8 place-items-center p-0"
+          className="control-button icon-button grid h-8 w-8 place-items-center text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
           title={t("settings")}
           aria-label={t("settings")}
         >
           <svg
             aria-hidden="true"
-            viewBox="0 0 24 24"
-            className="h-4 w-4"
+            viewBox="0 0 20 20"
+            className="block h-[18px] w-[18px]"
             fill="none"
             stroke="currentColor"
             strokeLinecap="round"
             strokeLinejoin="round"
-            strokeWidth="2"
+            strokeWidth="1.7"
           >
-            <path d="M4 7h4" />
-            <path d="M12 7h8" />
-            <path d="M4 17h8" />
-            <path d="M16 17h4" />
-            <path d="M4 12h10" />
-            <path d="M18 12h2" />
-            <circle cx="10" cy="7" r="2" />
-            <circle cx="14" cy="17" r="2" />
-            <circle cx="16" cy="12" r="2" />
+            <path d="M4 6.25h3.25" />
+            <path d="M10.75 6.25H16" />
+            <circle cx="9" cy="6.25" r="1.7" />
+            <path d="M4 13.75h6.25" />
+            <path d="M13.75 13.75H16" />
+            <circle cx="12" cy="13.75" r="1.7" />
           </svg>
         </button>
       </div>

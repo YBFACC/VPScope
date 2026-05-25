@@ -100,6 +100,47 @@ pnpm dev
 pnpm build
 ```
 
+### macOS Release Signing
+
+GitHub Actions 会在打 tag 时生成 draft release。macOS 从浏览器下载的 `.app`/`.dmg` 需要代码签名；面向普通用户分发时，还需要使用 `Developer ID Application` 证书完成 Apple notarization。否则 Gatekeeper 可能提示应用“已损坏，无法打开”。
+
+仓库当前的 release workflow 分两种情况：
+
+- 没有 Apple Developer secrets：使用 ad-hoc signing，仅适合开发和内测分发；用户仍可能需要在系统设置中手动允许运行，或移除 quarantine 标记。
+- 配置了 Apple Developer secrets：使用 Developer ID 证书签名，并在提供公证凭据时执行 notarization，适合作为正式下载包发布。
+
+要发布 Gatekeeper-ready 构建，在 GitHub repository secrets 中配置：
+
+```text
+APPLE_CERTIFICATE          # Developer ID Application .p12 的 base64 内容
+APPLE_CERTIFICATE_PASSWORD # 导出 .p12 时设置的密码
+KEYCHAIN_PASSWORD          # CI 临时 keychain 密码
+```
+
+然后选择一种 notarization 凭据：
+
+```text
+APPLE_ID
+APPLE_PASSWORD             # Apple ID app-specific password
+APPLE_TEAM_ID
+```
+
+或：
+
+```text
+APPLE_API_ISSUER
+APPLE_API_KEY
+APPLE_API_KEY_PRIVATE      # App Store Connect AuthKey_*.p8 文件内容
+```
+
+如果已经下载到本地的旧构建仍出现“已损坏”提示，可以先删除 quarantine 标记用于本机验证：
+
+```bash
+xattr -dr com.apple.quarantine /Applications/VPScope.app
+```
+
+这只是开发/内测绕过方式，正式 release 应以签名和公证后的产物为准。
+
 ## Scripts
 
 ```bash

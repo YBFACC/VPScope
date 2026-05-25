@@ -23,6 +23,7 @@ type HostStore = {
   deleteHost: (hostId: HostId) => Promise<void>;
   testConnection: (payload: HostTestConnectionPayload) => Promise<void>;
   setConnectionState: (state: HostConnectionState) => void;
+  setHostsDisconnected: (hostIds: HostId[]) => void;
 };
 
 const defaultState = (hostId: HostId): HostConnectionState => ({
@@ -133,6 +134,18 @@ export const useHostStore = create<HostStore>((set, get) => ({
       connectionStates: {
         ...current.connectionStates,
         [state.hostId]: state,
+      },
+    }));
+  },
+  setHostsDisconnected(hostIds) {
+    if (hostIds.length === 0) {
+      return;
+    }
+
+    set((current) => ({
+      connectionStates: {
+        ...current.connectionStates,
+        ...Object.fromEntries(hostIds.map((hostId) => [hostId, defaultState(hostId)])),
       },
     }));
   },
