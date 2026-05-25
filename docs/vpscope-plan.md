@@ -400,6 +400,7 @@ settings_update
 
 - SSH session 按 host 复用，不为每个面板新建连接。
 - 采集分 `active`、`overview`、`tray` 三档：详情页 500ms-10000ms，总览 5000ms-30000ms，菜单栏/隐藏窗口 30000ms-300000ms。
+- 关闭主窗口只隐藏窗口并保留后台进程，菜单栏继续显示 `tray` profile 的轻量监控；Cmd+Q 或菜单栏 Quit 才真正退出 app。
 - 进程列表只在 `active` profile 刷新，避免长期静默或总览页反复运行 `ps`。
 - 后端保留 last-known snapshot，窗口打开时先显示最近状态。
 - 最后一个订阅取消后延迟释放 SSH session，兼顾快速重新打开和长期静默低资源。

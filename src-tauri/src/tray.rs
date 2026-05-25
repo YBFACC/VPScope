@@ -298,7 +298,7 @@ fn tray_api_error(error: tauri::Error) -> AppError {
     AppError::internal("Failed to update menu bar status").with_detail(error.to_string())
 }
 
-fn show_main_window(app: &AppHandle) {
+pub(crate) fn show_main_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
         let _ = window.unminimize();
