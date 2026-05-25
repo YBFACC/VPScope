@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { runClient, tauriClient } from "@/lib/tauriClient";
+import { useAlertSettingsStore } from "@/stores/alertSettingsStore";
 import { useMetricsStore } from "@/stores/metricsStore";
 import { useTraySettingsStore } from "@/stores/traySettingsStore";
 import type {
@@ -78,6 +79,7 @@ export const useHostStore = create<HostStore>((set, get) => ({
   async deleteHost(hostId) {
     await runClient(() => tauriClient.deleteHost(hostId));
     await useMetricsStore.getState().removeHostData(hostId);
+    useAlertSettingsStore.getState().removeHost(hostId);
     useTraySettingsStore.getState().removeHost(hostId);
 
     set((state) => {

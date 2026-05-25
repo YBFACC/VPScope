@@ -145,6 +145,23 @@ export type TraySettings = {
   items: TraySettingsItem[];
 };
 
+export type AlertMetric = "cpu";
+
+export type AlertRule = {
+  id: string;
+  hostId: HostId;
+  metric: AlertMetric;
+  enabled: boolean;
+  thresholdPercent: number;
+  cooldownMs: number;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type AlertSettings = {
+  rules: AlertRule[];
+};
+
 export type ProcessListPayload = {
   hostId: HostId;
   sortBy: "cpu" | "memory" | "pid" | "name";
@@ -236,6 +253,8 @@ export type VpscopeCommandPayloads = {
   process_list: ProcessListPayload;
   tray_settings_get: Record<string, never>;
   tray_settings_update: TraySettings;
+  alert_settings_get: Record<string, never>;
+  alert_settings_update: { settings: AlertSettings };
 };
 
 export type VpscopeCommandResults = {
@@ -251,4 +270,6 @@ export type VpscopeCommandResults = {
   process_list: ProcessListResult;
   tray_settings_get: TraySettings;
   tray_settings_update: TraySettings;
+  alert_settings_get: AlertSettings;
+  alert_settings_update: AlertSettings;
 };

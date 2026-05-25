@@ -8,4 +8,7 @@ pub use hosts::{
 };
 pub use metrics::{metrics_last_snapshot, metrics_subscribe, metrics_unsubscribe};
 pub use processes::process_list;
-pub use settings::{health_check, tray_settings_get, tray_settings_update};
+pub use settings::{
+    alert_settings_get, alert_settings_update, health_check, tray_settings_get,
+    tray_settings_update,
+};

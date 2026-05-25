@@ -161,6 +161,23 @@ export type TraySettingsItem = {
 export type TraySettings = {
   items: TraySettingsItem[];
 };
+
+export type AlertMetric = "cpu";
+
+export type AlertRule = {
+  id: string;
+  hostId: HostId;
+  metric: AlertMetric;
+  enabled: boolean;
+  thresholdPercent: number;
+  cooldownMs: number;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type AlertSettings = {
+  rules: AlertRule[];
+};
 ```
 
 ## Tauri Commands
@@ -397,6 +414,59 @@ type TraySettingsUpdatePayload = TraySettings;
 
 ```ts
 type TraySettingsUpdateResult = TraySettings;
+```
+
+### `alert_settings_get`
+
+用途：读取 CPU 预警提醒配置。该配置只保存普通偏好，不包含 SSH 凭据、地址或用户名；通知标题由前端用 host 名称和当前 CPU 值生成。
+
+请求：
+
+```ts
+type AlertSettingsGetPayload = {};
+```
+
+响应：
+
+```ts
+type AlertSettings = {
+  rules: Array<{
+    id: string;
+    hostId: HostId;
+    metric: "cpu";
+    enabled: boolean;
+    thresholdPercent: number;
+    cooldownMs: number;
+    createdAt: number;
+    updatedAt: number;
+  }>;
+};
+```
+
+规则：
+
+- `hostId` 必须指向现有 host。
+- 每个 `hostId + metric` 最多一条规则。
+- `thresholdPercent` 必须在 `1..100`。
+- `cooldownMs` 必须在 `60000..3600000`。
+- 删除 host 时后端会同步删除对应预警规则。
+
+### `alert_settings_update`
+
+用途：更新 CPU 预警提醒配置。第一版只支持 CPU；触发逻辑由前端在接收 `HostSnapshot` 后评估，并通过 Tauri notification 插件发送 macOS 原生通知。
+
+请求：
+
+```ts
+type AlertSettingsUpdatePayload = {
+  settings: AlertSettings;
+};
+```
+
+响应：
+
+```ts
+type AlertSettingsUpdateResult = AlertSettings;
 ```
 
 ### `process_list`

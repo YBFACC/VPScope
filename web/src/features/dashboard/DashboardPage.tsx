@@ -5,6 +5,7 @@ import { HostSidebar } from "@/features/hosts/HostSidebar";
 import { OverviewPage } from "@/features/overview/OverviewPage";
 import { useI18n } from "@/i18n/useI18n";
 import { runClient, tauriClient } from "@/lib/tauriClient";
+import { alertHostIds, useAlertSettingsStore } from "@/stores/alertSettingsStore";
 import { useHostStore, useSelectedHost } from "@/stores/hostStore";
 import {
   useMetricsStore,
@@ -43,6 +44,9 @@ export function DashboardPage() {
   const ingestMetricsError = useMetricsStore((state) => state.ingestMetricsError);
   const snapshots = useMetricsStore((state) => state.snapshots);
   const errorsByHost = useMetricsStore((state) => state.errorsByHost);
+  const alertSettings = useAlertSettingsStore((state) => state.settings);
+  const loadAlertSettings = useAlertSettingsStore((state) => state.load);
+  const evaluateAlertSnapshot = useAlertSettingsStore((state) => state.evaluateSnapshot);
   const traySettings = useTraySettingsStore((state) => state.settings);
   const loadTraySettings = useTraySettingsStore((state) => state.load);
   const snapshot = useSelectedSnapshot(selectedHostId);
@@ -59,7 +63,16 @@ export function DashboardPage() {
   useEffect(() => {
     void loadHosts();
     void loadTraySettings();
-  }, [loadHosts, loadTraySettings]);
+    void loadAlertSettings();
+  }, [loadAlertSettings, loadHosts, loadTraySettings]);
+
+  useEffect(() => {
+    for (const snapshot of Object.values(snapshots)) {
+      if (snapshot) {
+        void evaluateAlertSnapshot(snapshot, hosts);
+      }
+    }
+  }, [evaluateAlertSnapshot, hosts, snapshots]);
 
   useEffect(() => {
     let stopListeningErrors: (() => void) | undefined;
@@ -109,10 +122,13 @@ export function DashboardPage() {
 
   useEffect(() => {
     const trayIds = trayHostIds(traySettings);
+    const enabledAlertIds = alertHostIds(alertSettings);
+    const hiddenHostIds = Array.from(new Set([...trayIds, ...enabledAlertIds]));
+    const backgroundAlertIds = enabledAlertIds.filter((hostId) => hostId !== selectedHostId);
 
     if (!isWindowVisible) {
       void clearSubscription();
-      void subscribeToHosts(trayIds, "tray");
+      void subscribeToHosts(hiddenHostIds, "tray");
       return () => {
         void clearOverviewSubscriptions();
       };
@@ -126,21 +142,26 @@ export function DashboardPage() {
       };
     }
 
-    void clearOverviewSubscriptions();
-
     if (!selectedHostId) {
       void clearSubscription();
+      void subscribeToHosts(enabledAlertIds, "tray");
       setHostsDisconnected(hosts.map((host) => host.id));
       return;
     }
 
     void subscribeToHost(selectedHostId);
-    setHostsDisconnected(hosts.map((host) => host.id).filter((hostId) => hostId !== selectedHostId));
+    void subscribeToHosts(backgroundAlertIds, "tray");
+    setHostsDisconnected(
+      hosts
+        .map((host) => host.id)
+        .filter((hostId) => hostId !== selectedHostId && !backgroundAlertIds.includes(hostId)),
+    );
 
     return () => {
       void clearSubscription();
     };
   }, [
+    alertSettings,
     clearOverviewSubscriptions,
     clearSubscription,
     hosts,

@@ -12,14 +12,16 @@ pub mod tray;
 pub fn run() {
     use app_state::AppState;
     use commands::{
-        health_check, host_create, host_delete, host_list, host_ssh_config_list,
-        host_test_connection, host_update, metrics_last_snapshot, metrics_subscribe,
-        metrics_unsubscribe, process_list, tray_settings_get, tray_settings_update,
+        alert_settings_get, alert_settings_update, health_check, host_create, host_delete,
+        host_list, host_ssh_config_list, host_test_connection, host_update, metrics_last_snapshot,
+        metrics_subscribe, metrics_unsubscribe, process_list, tray_settings_get,
+        tray_settings_update,
     };
     use tauri::{Manager, WindowEvent};
     use tray::setup_tray;
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_notification::init())
         .on_window_event(|window, event| {
             if window.label() != "main" {
                 return;
@@ -48,6 +50,8 @@ pub fn run() {
             metrics_subscribe,
             metrics_unsubscribe,
             process_list,
+            alert_settings_get,
+            alert_settings_update,
             tray_settings_get,
             tray_settings_update,
         ])

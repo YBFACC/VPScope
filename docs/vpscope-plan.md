@@ -373,7 +373,8 @@ Tauri capability 方向：
   "identifier": "main-capability",
   "windows": ["main"],
   "permissions": [
-    "core:default"
+    "core:default",
+    "notification:default"
   ]
 }
 ```
@@ -390,10 +391,10 @@ metrics_last_snapshot
 metrics_subscribe
 metrics_unsubscribe
 process_list
-theme_list
-theme_apply
-settings_get
-settings_update
+tray_settings_get
+tray_settings_update
+alert_settings_get
+alert_settings_update
 ```
 
 ## 性能策略
@@ -401,6 +402,7 @@ settings_update
 - SSH session 按 host 复用，不为每个面板新建连接。
 - 采集分 `active`、`overview`、`tray` 三档：详情页 500ms-10000ms，总览 5000ms-30000ms，菜单栏/隐藏窗口 30000ms-300000ms。
 - 关闭主窗口只隐藏窗口并保留后台进程，菜单栏继续显示 `tray` profile 的轻量监控；Cmd+Q 或菜单栏 Quit 才真正退出 app。
+- CPU 预警提醒启用后，即使主窗口隐藏或当前详情页不是该 host，也要用轻量 `tray` profile 保持对应 host 的后台采样。
 - 进程列表只在 `active` profile 刷新，避免长期静默或总览页反复运行 `ps`。
 - 后端保留 last-known snapshot，窗口打开时先显示最近状态。
 - 最后一个订阅取消后延迟释放 SSH session，兼顾快速重新打开和长期静默低资源。
@@ -422,11 +424,13 @@ settings_update
 - CPU、内存、磁盘、网络、进程列表。
 - 主题切换：至少 2 个内置 theme。
 - 刷新间隔配置。
+- 每台 VPS 的 CPU 阈值预警提醒：第一版只支持 CPU，默认 `>= 90%`，通过 macOS 原生通知发送，并按规则冷却时间节流。
 - 基础错误状态：连接失败、认证失败、命令不可用、权限不足。
 
 暂不做：
 
-- 告警通知。
+- 内存、磁盘、网络、负载等非 CPU 预警。
+- 预警恢复通知和多条件组合规则。
 - 多 host 聚合总览。
 - Docker/Kubernetes 指标。
 - server agent。

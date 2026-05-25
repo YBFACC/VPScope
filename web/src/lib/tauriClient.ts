@@ -1,7 +1,14 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import {
+  isPermissionGranted,
+  requestPermission,
+  sendNotification,
+  type PermissionState,
+} from "@tauri-apps/plugin-notification";
 import { createMockTauriClient } from "@/mocks/mockTauriClient";
 import type {
+  AlertSettings,
   AppError,
   HostConfig,
   HostConnectionState,
@@ -19,9 +26,14 @@ import type {
   TraySettings,
 } from "@/types/contracts";
 
+export type NativeNotificationPermission = "granted" | "denied" | "prompt";
 export type MetricsSnapshotHandler = (snapshot: HostSnapshot) => void;
 export type MetricsErrorHandler = (event: MetricsErrorEvent) => void;
 export type HostConnectionStateHandler = (state: HostConnectionState) => void;
+export type NotificationPayload = {
+  title: string;
+  body: string;
+};
 
 export type VPScopeClient = {
   listHosts(): Promise<HostConfig[]>;
@@ -37,6 +49,11 @@ export type VPScopeClient = {
   listProcesses(payload: ProcessListPayload): Promise<ProcessInfo[]>;
   getTraySettings(): Promise<TraySettings>;
   updateTraySettings(settings: TraySettings): Promise<TraySettings>;
+  getAlertSettings(): Promise<AlertSettings>;
+  updateAlertSettings(settings: AlertSettings): Promise<AlertSettings>;
+  getNotificationPermission(): Promise<NativeNotificationPermission>;
+  requestNotificationPermission(): Promise<NativeNotificationPermission>;
+  sendNativeNotification(payload: NotificationPayload): Promise<void>;
 };
 
 function toAppError(error: unknown): AppError {
@@ -52,6 +69,9 @@ function toAppError(error: unknown): AppError {
 }
 
 function createTauriClient(): VPScopeClient {
+  const normalizePermission = (permission: PermissionState | NotificationPermission): NativeNotificationPermission =>
+    permission === "granted" || permission === "denied" ? permission : "prompt";
+
   return {
     async listHosts() {
       return invoke<HostConfig[]>("host_list", {});
@@ -105,6 +125,40 @@ function createTauriClient(): VPScopeClient {
     },
     async updateTraySettings(settings) {
       return invoke<TraySettings>("tray_settings_update", { settings });
+    },
+    async getAlertSettings() {
+      return invoke<AlertSettings>("alert_settings_get", {});
+    },
+    async updateAlertSettings(settings) {
+      return invoke<AlertSettings>("alert_settings_update", { settings });
+    },
+    async getNotificationPermission() {
+      if (typeof window === "undefined" || !("Notification" in window)) {
+        return "denied";
+      }
+
+      const granted = await isPermissionGranted();
+      return granted ? "granted" : normalizePermission(window.Notification.permission);
+    },
+    async requestNotificationPermission() {
+      if (typeof window === "undefined" || !("Notification" in window)) {
+        return "denied";
+      }
+
+      return normalizePermission(await requestPermission());
+    },
+    async sendNativeNotification(payload) {
+      const granted = await isPermissionGranted();
+
+      if (!granted) {
+        throw {
+          code: "CONFIG_INVALID",
+          message: "macOS notification permission is not granted",
+          retryable: false,
+        } satisfies AppError;
+      }
+
+      sendNotification(payload);
     },
   };
 }

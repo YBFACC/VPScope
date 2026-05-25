@@ -1,7 +1,14 @@
 import { mockConnectionStates, mockHosts } from "@/mocks/mockHosts";
 import { createMockSnapshot } from "@/mocks/mockSnapshots";
 import type { VPScopeClient } from "@/lib/tauriClient";
-import type { HostConfig, HostCreatePayload, HostId, ProcessListPayload, TraySettings } from "@/types/contracts";
+import type {
+  AlertSettings,
+  HostConfig,
+  HostCreatePayload,
+  HostId,
+  ProcessListPayload,
+  TraySettings,
+} from "@/types/contracts";
 
 let hosts: HostConfig[] = mockHosts.map((host) => ({ ...host }));
 let traySettings: TraySettings = {
@@ -12,6 +19,9 @@ let traySettings: TraySettings = {
       displayMode: "text",
     },
   ],
+};
+let alertSettings: AlertSettings = {
+  rules: [],
 };
 
 function wait(ms = 180) {
@@ -123,6 +133,9 @@ export function createMockTauriClient(): VPScopeClient {
     async deleteHost(id: HostId) {
       await wait(160);
       hosts = hosts.filter((host) => host.id !== id);
+      alertSettings = {
+        rules: alertSettings.rules.filter((rule) => rule.hostId !== id),
+      };
     },
     async testConnection(payload) {
       await wait(520);
@@ -193,6 +206,30 @@ export function createMockTauriClient(): VPScopeClient {
       return {
         items: traySettings.items.map((item) => ({ ...item })),
       };
+    },
+    async getAlertSettings() {
+      await wait(80);
+      return {
+        rules: alertSettings.rules.map((rule) => ({ ...rule })),
+      };
+    },
+    async updateAlertSettings(settings) {
+      await wait(160);
+      alertSettings = {
+        rules: settings.rules.map((rule) => ({ ...rule })),
+      };
+      return {
+        rules: alertSettings.rules.map((rule) => ({ ...rule })),
+      };
+    },
+    async getNotificationPermission() {
+      return "granted";
+    },
+    async requestNotificationPermission() {
+      return "granted";
+    },
+    async sendNativeNotification(payload) {
+      console.info("[mock notification]", payload.title, payload.body);
     },
   };
 }
