@@ -4,6 +4,54 @@ VPScope is a macOS desktop app for monitoring local and remote VPS resource usag
 
 This file is the working contract for coding agents in this repository. Read it before making changes.
 
+## Global Agent Rules
+
+### Language
+
+Default to Chinese in user-facing replies unless the user explicitly requests another language.
+
+### Collaboration Style
+
+- Treat the user as a capable collaborator. Be warm, candid, practical, and concise.
+- Lead with the answer or outcome, then include only the context needed to trust it.
+- Understand intent with minimal prompting. If a low-risk assumption is available, state it briefly and proceed.
+- Ask for clarification only when missing information would materially change the work or create meaningful risk.
+- Do not add unrelated features, speculative follow-ups, broad rewrites, or post-answer enhancement suggestions.
+
+### Preamble
+
+Before tool calls for a multi-step coding task, send a short user-visible update that acknowledges the request and states the first step. Keep it to one or two sentences.
+
+### Planning
+
+- For non-trivial coding tasks, produce a short plan covering root cause, affected files, hotfix vs structural scope, approach, and validation.
+- For large tasks, compare a minimal patch with a root-cause fix. Choose the maintainable option when the minimal patch increases inconsistency or debt.
+- Proceed directly for trivial edits.
+- After each significant step, ask whether the user's core request can now be answered with sufficient evidence. If yes, answer and stop.
+
+### Debug-First Policy
+
+Let failures surface clearly through explicit errors, exceptions, logs, or failing tests. Do not introduce silent fallbacks, mock success paths, broad catch-all guards, or defensive behavior just to make things appear to run. If a security, safety, or privacy boundary is necessary, make it explicit, documented, easy to disable when appropriate, and agreed by the user beforehand.
+
+### Bug-Fix Philosophy
+
+- Trace the root cause from first principles. Do not only patch the visible symptom.
+- Prefer subtraction: remove redundant config, dead branches, unnecessary gates, and obsolete logic before adding new layers.
+- Avoid duplicate implementations, second sources of truth, parallel validation or permission logic, hidden fallback behavior, broad try/catch blocks that swallow errors, and silent defaults that mask bad data.
+- If any of those patterns is necessary, explain why and keep it bounded.
+
+### Structural Fix Trigger
+
+Treat a task as structural, not a local hotfix, when it touches duplicated business logic, multiple sources of truth, shared validation, permissions, routing, caching, API contracts, schemas, migrations, cross-module behavior, flaky tests, hidden fallbacks, repeated bug patterns, state synchronization, or security and data-integrity boundaries. For structural fixes, identify the invariant that should hold, express it in one place, and remove obsolete logic instead of layering around it.
+
+### Resource Use
+
+Use available tools, MCPs, skills, browser checks, tests, and parallel agents when they materially improve evidence quality, runtime verification, or codebase understanding. Stop once the core request is answered with sufficient evidence.
+
+### Skills
+
+Skills live in `~/.codex/skills/` and `.codex/skills/`. Before starting a task, scan available skills. If one matches, read its `SKILL.md`, follow it, and announce which skill is being used.
+
 ## Product Positioning
 
 VPScope monitors server health and resource usage through a native desktop experience.
@@ -254,6 +302,17 @@ Integration changes:
 
 Do not claim a task is complete if the relevant verification was not run or if the repository has not yet been scaffolded enough to run it. State what was verified and what could not yet be verified.
 
+When applicable, run validation in this order:
+
+1. Targeted unit tests for changed behavior.
+2. Type checks or lint checks.
+3. Build checks for affected packages.
+4. A minimal smoke test.
+
+Backend unit tests must have a hard timeout of 60 seconds.
+
+Before finalizing, scan the diff for symptom patching, duplicated logic, hidden fallbacks, broad error swallowing, second sources of truth, dead code, unmentioned behavior changes, weak tests, and security regressions. Fix clear issues before responding.
+
 ## Implementation Style
 
 - Prefer small, explicit modules over broad abstractions.
@@ -264,6 +323,19 @@ Do not claim a task is complete if the relevant verification was not run or if t
 - Keep credential handling behind a narrow interface.
 - Avoid unrelated refactors.
 - Do not silently change the product scope.
+- Prefer short functions, shallow nesting, early returns, named constants, and few parameters.
+- Keep business logic decoupled from concrete implementations; inject dependencies through parameters or interfaces.
+- Prefer immutable data flow. Return new values instead of mutating parameters or global state.
+- Comments should explain intent or tradeoffs, not restate what the code already says.
+- Keep diffs targeted, but remove dead code when changing behavior unless compatibility is explicitly required.
+- Handle edge cases with clear failure paths instead of assuming ideal input.
+
+## Security Baseline
+
+- Never hardcode secrets, API keys, or credentials. Use environment variables, macOS Keychain, or an appropriate secret manager.
+- Use parameterized queries for database access if database code is added.
+- Never concatenate user input into SQL, local shell commands, or remote commands.
+- Validate and sanitize external input at system boundaries.
 
 ## Dependency Guidance
 
@@ -308,4 +380,3 @@ Do not:
 - Hard-code the visual theme into dashboard components.
 - Replace the app with a landing page or generic admin template.
 - Change the interface contract without updating docs, frontend types, backend structs, mocks, and tests.
-
