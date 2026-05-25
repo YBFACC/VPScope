@@ -76,6 +76,19 @@ function sortProcesses(payload: ProcessListPayload) {
   return typeof payload.limit === "number" ? sorted.slice(0, payload.limit) : sorted;
 }
 
+function createSubscriptionSnapshot(hostId: HostId, profile = "active") {
+  const snapshot = createMockSnapshot(hostId);
+
+  if (profile !== "active") {
+    return {
+      ...snapshot,
+      processes: [],
+    };
+  }
+
+  return snapshot;
+}
+
 export function createMockTauriClient(): VPScopeClient {
   return {
     async listHosts() {
@@ -159,12 +172,12 @@ export function createMockTauriClient(): VPScopeClient {
     async subscribeMetrics(payload, onSnapshot) {
       await wait(80);
       const { hostId } = payload;
-      onSnapshot(createMockSnapshot(hostId));
+      onSnapshot(createSubscriptionSnapshot(hostId, payload.profile));
       const host = hosts.find((candidate) => candidate.id === hostId);
       const profileInterval =
         payload.profile === "tray" ? 30_000 : payload.profile === "overview" ? 5_000 : undefined;
       const interval = window.setInterval(() => {
-        onSnapshot(createMockSnapshot(hostId));
+        onSnapshot(createSubscriptionSnapshot(hostId, payload.profile));
       }, payload.intervalMs ?? profileInterval ?? host?.refreshIntervalMs ?? 2_000);
 
       return async () => {

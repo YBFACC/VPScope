@@ -11,6 +11,7 @@ import {
   useMetricsStore,
   useSelectedHistory,
   useSelectedMetricsError,
+  useSelectedProcesses,
   useSelectedSnapshot,
 } from "@/stores/metricsStore";
 import { trayHostIds, useTraySettingsStore } from "@/stores/traySettingsStore";
@@ -51,6 +52,7 @@ export function DashboardPage() {
   const loadTraySettings = useTraySettingsStore((state) => state.load);
   const snapshot = useSelectedSnapshot(selectedHostId);
   const history = useSelectedHistory(selectedHostId);
+  const processes = useSelectedProcesses(selectedHostId);
   const metricsError = useSelectedMetricsError(selectedHostId);
   const viewMode = useUiStore((state) => state.viewMode);
   const setViewMode = useUiStore((state) => state.setViewMode);
@@ -183,11 +185,11 @@ export function DashboardPage() {
       }
 
       if (event.key === "ArrowDown") {
-        moveFocusedProcess(1, snapshot?.processes.length ?? 0);
+        moveFocusedProcess(1, processes.length);
       }
 
       if (event.key === "ArrowUp") {
-        moveFocusedProcess(-1, snapshot?.processes.length ?? 0);
+        moveFocusedProcess(-1, processes.length);
       }
 
       if (event.key === "Escape") {
@@ -201,7 +203,7 @@ export function DashboardPage() {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [moveFocusedProcess, setProcessSort, setSearch, snapshot?.processes.length]);
+  }, [moveFocusedProcess, processes.length, setProcessSort, setSearch]);
 
   return (
     <main className="h-screen overflow-hidden bg-[var(--color-bg)] p-2 text-[var(--color-text)] lg:p-3">
@@ -250,7 +252,7 @@ export function DashboardPage() {
                 <NetworkPanel snapshot={snapshot} rxHistory={history?.rx ?? []} txHistory={history?.tx ?? []} />
                 <DiskPanel snapshot={snapshot} />
                 <DetailsPanel host={selectedHost} snapshot={snapshot} connection={connection} />
-                <ProcessPanel processes={snapshot.processes} />
+                <ProcessPanel processes={processes} />
               </div>
             )}
           </section>

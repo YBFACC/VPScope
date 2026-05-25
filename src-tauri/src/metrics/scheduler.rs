@@ -18,8 +18,10 @@ use std::{
     sync::{Arc, RwLock},
     time::Duration,
 };
-use tauri::{AppHandle, Emitter};
-use tokio::task::JoinHandle;
+use tauri::{
+    async_runtime::{self, JoinHandle},
+    AppHandle, Emitter,
+};
 use uuid::Uuid;
 
 const SSH_IDLE_DISCONNECT_MS: u64 = 300_000;
@@ -67,7 +69,7 @@ impl MetricsScheduler {
         let interval = Duration::from_millis(
             profile.resolve_interval_ms(interval_ms, host.refresh_interval_ms),
         );
-        let handle = tokio::spawn(run_subscription_loop(
+        let handle = async_runtime::spawn(run_subscription_loop(
             host,
             ssh,
             app,
@@ -133,7 +135,7 @@ impl MetricsScheduler {
 
         let scheduler = Arc::clone(self);
         let task_host_id = host_id.clone();
-        let handle = tokio::spawn(async move {
+        let handle = async_runtime::spawn(async move {
             tokio::time::sleep(Duration::from_millis(SSH_IDLE_DISCONNECT_MS)).await;
 
             if scheduler
