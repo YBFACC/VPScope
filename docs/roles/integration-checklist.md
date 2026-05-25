@@ -1,0 +1,41 @@
+# VPScope 联调验收清单
+
+## 契约基线
+
+- [ ] `docs/roles/contracts.md`、`web/src/types/contracts.ts`、Rust serde 结构字段一致。
+- [ ] 所有时间字段为 Unix milliseconds。
+- [ ] 所有 byte 字段为 bytes。
+- [ ] 所有 percent 字段为 `0` 到 `100` 的 number。
+- [ ] `AppError.code` 覆盖 `CONFIG_INVALID`、`HOST_NOT_FOUND`、`SSH_AUTH_FAILED`、`SSH_CONNECT_FAILED`、`SSH_HOST_KEY_CHANGED`、`SSH_HOST_KEY_UNKNOWN`、`REMOTE_COMMAND_FAILED`、`REMOTE_UNSUPPORTED`、`PARSER_FAILED`、`INTERNAL`。
+
+## Mock 数据
+
+- [x] `idleHost` 覆盖低负载、多核心 CPU、swap 为 0、多磁盘、多网卡。
+- [x] `busyHost` 覆盖高负载、swap 非 0、多磁盘、多网卡、超过 200 个进程、长 command。
+- [x] `errorHost` 覆盖空进程、空设备、降级 snapshot。
+- [x] mock connection/error event payload 与契约类型一致。
+
+## Parser Fixture
+
+- [x] `/proc/stat` fixture 覆盖总 CPU 与多核心 counter。
+- [x] `/proc/meminfo` fixture 覆盖 memory、cache、swap。
+- [x] `/proc/net/dev` fixture 覆盖 `lo`、多物理/虚拟网卡。
+- [x] `df -P` fixture 覆盖多 mount 和长 mount path。
+- [x] `ps` fixture 覆盖 command 中包含空格和长参数。
+
+## 待后端接入
+
+- [ ] 将 parser 输出映射到最终 `HostSnapshot` Rust serde structs。
+- [ ] 将 parser 错误转换为契约中的 `AppError { code: "PARSER_FAILED" }`。
+- [ ] 在 metrics collector 中用相邻采样计算 CPU、network、disk IO rate。
+
+## 手工联调
+
+- [ ] 新增 host。
+- [ ] 测试连接。
+- [ ] 首次连接确认 fingerprint。
+- [ ] Dashboard 连续观察 5 分钟。
+- [ ] 与 `top`、`free -m`、`df -h`、`cat /proc/loadavg` 对比。
+- [ ] 断网或停 sshd 后 UI 进入可恢复错误状态。
+- [ ] 恢复网络后 snapshot 继续更新。
+- [ ] 删除 host 后不再收到旧订阅事件。

@@ -1,0 +1,5 @@
+Filesystem     1024-blocks      Used Available Capacity Mounted on
+/dev/vda1         82022488  24111240  53702488      31% /
+/dev/vdb1        251658240 178257920  73400320      71% /srv/data
+tmpfs              2019560         0   2019560       0% /run/user/1000
+storage.example:/exports/build-cache 2147483648 1258291200 889192448 59% /mnt/object-sync/very/long/mount/path/that/should/not/stretch/the/disk/panel

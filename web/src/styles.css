@@ -1,0 +1,146 @@
+@import "tailwindcss";
+
+:root {
+  --color-bg: #050605;
+  --color-panel: #090b09;
+  --color-panel-muted: #111511;
+  --color-border: #314238;
+  --color-border-strong: #55705f;
+  --color-text: #e8ede8;
+  --color-text-muted: #89928a;
+  --color-cpu: #8ff0b4;
+  --color-memory: #f4d35e;
+  --color-disk: #a7e879;
+  --color-network-rx: #b56cff;
+  --color-network-tx: #4dd8ff;
+  --color-warning: #ffba52;
+  --color-danger: #ff6b6b;
+  --color-accent: #92d7ff;
+  --color-chart-grid: #1e2a22;
+  --color-bar-track: #2b302c;
+  --color-row-hover: #121a14;
+  --color-input: #0c100d;
+  --color-overlay: rgba(0, 0, 0, 0.42);
+  --shadow-panel: 0 16px 40px rgba(0, 0, 0, 0.34);
+  --color-bar-step-0: #55705f;
+  --color-bar-step-1: #8ff0b4;
+  --color-bar-step-2: #f4d35e;
+  --color-bar-step-3: #ffba52;
+  --color-bar-step-4: #ff6b6b;
+  --radius-panel: 6px;
+  --radius-control: 5px;
+  --font-ui: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", Monaco, Consolas, monospace;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-ui);
+  font-size: 13px;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: default;
+}
+
+button:disabled {
+  opacity: 0.55;
+}
+
+.control-button {
+  height: 2rem;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-border);
+  background: var(--color-input);
+  padding: 0 0.65rem;
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  line-height: 1;
+}
+
+.control-button:hover {
+  background: var(--color-row-hover);
+  border-color: var(--color-border-strong);
+}
+
+.dashboard-grid {
+  display: grid;
+  min-height: 0;
+  height: 100%;
+  gap: 0.75rem;
+  grid-template-columns: minmax(250px, 0.82fr) minmax(360px, 1.1fr) minmax(270px, 0.86fr);
+  grid-template-rows: minmax(0, 0.92fr) minmax(0, 0.9fr) minmax(0, 1.08fr);
+  grid-template-areas:
+    "cpu network details"
+    "memory disk details"
+    "process process process";
+}
+
+.dashboard-grid > :nth-child(1) {
+  grid-area: cpu;
+}
+
+.dashboard-grid > :nth-child(2) {
+  grid-area: memory;
+}
+
+.dashboard-grid > :nth-child(3) {
+  grid-area: network;
+}
+
+.dashboard-grid > :nth-child(4) {
+  grid-area: disk;
+}
+
+.dashboard-grid > :nth-child(5) {
+  grid-area: details;
+}
+
+.dashboard-grid > :nth-child(6) {
+  grid-area: process;
+}
+
+@media (max-width: 1279px) {
+  html,
+  body,
+  #root {
+    overflow: auto;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: none;
+    grid-template-areas:
+      "cpu"
+      "memory"
+      "network"
+      "disk"
+      "details"
+      "process";
+  }
+}
+
+.scrollbar-none {
+  scrollbar-width: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}

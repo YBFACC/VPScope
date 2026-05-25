@@ -1,0 +1,731 @@
+use crate::{
+    config::{HostAuth, HostConfig},
+    errors::{AppError, AppErrorCode},
+};
+use async_trait::async_trait;
+use openssh::{KnownHosts, Session, SessionBuilder};
+use serde::Serialize;
+use std::{
+    collections::HashMap,
+    io::ErrorKind,
+    sync::{Arc, Mutex},
+    time::Instant,
+};
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConnectionInfo {
+    pub ok: bool,
+    pub latency_ms: u64,
+    pub hostname: String,
+    pub os: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kernel: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fingerprint: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum RemoteCommand {
+    ProcStat,
+    ProcMeminfo,
+    ProcLoadavg,
+    ProcUptime,
+    ProcNetDev,
+    ProcDiskstats,
+    Df,
+    Ps,
+    Uname,
+}
+
+impl RemoteCommand {
+    pub fn as_fixed_command(self) -> &'static str {
+        match self {
+            Self::ProcStat => "cat /proc/stat",
+            Self::ProcMeminfo => "cat /proc/meminfo",
+            Self::ProcLoadavg => "cat /proc/loadavg",
+            Self::ProcUptime => "cat /proc/uptime",
+            Self::ProcNetDev => "cat /proc/net/dev",
+            Self::ProcDiskstats => "cat /proc/diskstats",
+            Self::Df => "df -P",
+            Self::Ps => "ps -eo pid,ppid,user,stat,pcpu,pmem,rss,args",
+            Self::Uname => "uname -a",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MetricsBatchMode {
+    Fast,
+    Full,
+}
+
+impl MetricsBatchMode {
+    fn includes_slow_metrics(self) -> bool {
+        matches!(self, Self::Full)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct RemoteMetricsOutput {
+    pub uname: Option<String>,
+    pub loadavg: String,
+    pub uptime: String,
+    pub proc_stat: String,
+    pub meminfo: String,
+    pub df: Option<String>,
+    pub net_dev: String,
+    pub diskstats: String,
+    pub ps: Option<String>,
+}
+
+#[async_trait]
+pub trait SshClient: Send + Sync {
+    async fn test_connection(&self, host: &HostConfig) -> Result<ConnectionInfo, AppError>;
+    async fn exec(&self, host: &HostConfig, command: RemoteCommand) -> Result<String, AppError>;
+    fn disconnect_host(&self, _host_id: &str) -> Result<(), AppError> {
+        Ok(())
+    }
+
+    async fn collect_metrics(
+        &self,
+        host: &HostConfig,
+        mode: MetricsBatchMode,
+    ) -> Result<RemoteMetricsOutput, AppError> {
+        let uname = if mode.includes_slow_metrics() {
+            Some(self.exec(host, RemoteCommand::Uname).await?)
+        } else {
+            None
+        };
+        let loadavg = self.exec(host, RemoteCommand::ProcLoadavg).await?;
+        let uptime = self.exec(host, RemoteCommand::ProcUptime).await?;
+        let proc_stat = self.exec(host, RemoteCommand::ProcStat).await?;
+        let meminfo = self.exec(host, RemoteCommand::ProcMeminfo).await?;
+        let df = if mode.includes_slow_metrics() {
+            Some(self.exec(host, RemoteCommand::Df).await?)
+        } else {
+            None
+        };
+        let net_dev = self.exec(host, RemoteCommand::ProcNetDev).await?;
+        let diskstats = self.exec(host, RemoteCommand::ProcDiskstats).await?;
+        let ps = if mode.includes_slow_metrics() {
+            Some(self.exec(host, RemoteCommand::Ps).await?)
+        } else {
+            None
+        };
+
+        Ok(RemoteMetricsOutput {
+            uname,
+            loadavg,
+            uptime,
+            proc_stat,
+            meminfo,
+            df,
+            net_dev,
+            diskstats,
+            ps,
+        })
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct MockSshClient;
+
+#[async_trait]
+impl SshClient for MockSshClient {
+    async fn test_connection(&self, host: &HostConfig) -> Result<ConnectionInfo, AppError> {
+        let started = Instant::now();
+        if host.address.trim().is_empty() {
+            return Err(AppError::new(
+                AppErrorCode::SshConnectFailed,
+                "Host address is empty",
+            ));
+        }
+
+        Ok(ConnectionInfo {
+            ok: true,
+            latency_ms: started.elapsed().as_millis() as u64,
+            hostname: host.name.clone(),
+            os: "mock-linux".to_string(),
+            kernel: Some("mock-kernel".to_string()),
+            fingerprint: None,
+        })
+    }
+
+    async fn exec(&self, _host: &HostConfig, command: RemoteCommand) -> Result<String, AppError> {
+        Err(AppError::new(
+            AppErrorCode::RemoteUnsupported,
+            "Real SSH execution is not implemented yet",
+        )
+        .with_detail(format!("fixedCommand={}", command.as_fixed_command())))
+    }
+}
+
+#[derive(Debug, Clone)]
+struct CachedSession {
+    signature: String,
+    session: Arc<Session>,
+}
+
+#[derive(Debug, Default)]
+pub struct OpenSshClient {
+    sessions: Mutex<HashMap<String, CachedSession>>,
+}
+
+impl OpenSshClient {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    fn builder_for(host: &HostConfig) -> Result<SessionBuilder, AppError> {
+        let mut builder = SessionBuilder::default();
+        builder
+            .port(host.port)
+            .known_hosts_check(KnownHosts::Add)
+            .connect_timeout(std::time::Duration::from_secs(8))
+            .server_alive_interval(std::time::Duration::from_secs(15));
+
+        match &host.auth {
+            HostAuth::Password { username, .. }
+            | HostAuth::PrivateKey { username, .. }
+            | HostAuth::SshAgent { username } => {
+                builder.user(username.clone());
+            }
+        }
+
+        if let HostAuth::PrivateKey {
+            key_path: Some(key_path),
+            ..
+        } = &host.auth
+        {
+            builder.keyfile(key_path);
+        }
+
+        Ok(builder)
+    }
+
+    async fn connect(host: &HostConfig) -> Result<Session, AppError> {
+        if host.address.trim().is_empty() {
+            return Err(AppError::config_invalid("Host address is required"));
+        }
+
+        Self::builder_for(host)?
+            .connect_mux(host.address.trim())
+            .await
+            .map_err(map_openssh_connect_error)
+    }
+
+    fn session_signature(host: &HostConfig) -> String {
+        let auth = match &host.auth {
+            HostAuth::Password { username, .. } => format!("password:{username}"),
+            HostAuth::PrivateKey {
+                username,
+                key_path,
+                key_ref,
+                passphrase_ref,
+            } => format!(
+                "private_key:{username}:{}:{}:{}",
+                key_path.as_deref().unwrap_or_default(),
+                key_ref.as_deref().unwrap_or_default(),
+                passphrase_ref.as_deref().unwrap_or_default()
+            ),
+            HostAuth::SshAgent { username } => format!("ssh_agent:{username}"),
+        };
+
+        format!(
+            "{}:{}:{}:{}",
+            host.address.trim(),
+            host.port,
+            host.updated_at,
+            auth
+        )
+    }
+
+    fn cached_session(&self, host: &HostConfig) -> Result<Option<Arc<Session>>, AppError> {
+        let signature = Self::session_signature(host);
+        let mut sessions = self
+            .sessions
+            .lock()
+            .map_err(|_| AppError::internal("SSH session cache lock is poisoned"))?;
+
+        let Some(cached) = sessions.get(&host.id) else {
+            return Ok(None);
+        };
+
+        if cached.signature == signature {
+            return Ok(Some(Arc::clone(&cached.session)));
+        }
+
+        sessions.remove(&host.id);
+        Ok(None)
+    }
+
+    fn store_session(&self, host: &HostConfig, session: Arc<Session>) -> Result<(), AppError> {
+        self.sessions
+            .lock()
+            .map_err(|_| AppError::internal("SSH session cache lock is poisoned"))?
+            .insert(
+                host.id.clone(),
+                CachedSession {
+                    signature: Self::session_signature(host),
+                    session,
+                },
+            );
+        Ok(())
+    }
+
+    fn drop_cached_session(&self, host_id: &str) -> Result<(), AppError> {
+        self.sessions
+            .lock()
+            .map_err(|_| AppError::internal("SSH session cache lock is poisoned"))?
+            .remove(host_id);
+        Ok(())
+    }
+
+    async fn session_for(&self, host: &HostConfig) -> Result<Arc<Session>, AppError> {
+        if let Some(session) = self.cached_session(host)? {
+            return Ok(session);
+        }
+
+        let session = Arc::new(Self::connect(host).await?);
+        self.store_session(host, Arc::clone(&session))?;
+        Ok(session)
+    }
+
+    async fn exec_program(
+        session: &Session,
+        program: &str,
+        args: &[&str],
+    ) -> Result<String, AppError> {
+        let output = session
+            .command(program)
+            .args(args)
+            .output()
+            .await
+            .map_err(map_openssh_command_error)?;
+
+        output_to_string(output)
+    }
+
+    async fn exec_shell(session: &Session, script: &str) -> Result<String, AppError> {
+        let output = session
+            .shell(script)
+            .output()
+            .await
+            .map_err(map_openssh_command_error)?;
+
+        output_to_string(output)
+    }
+
+    async fn exec_remote_command(
+        session: &Session,
+        command: RemoteCommand,
+    ) -> Result<String, AppError> {
+        match command {
+            RemoteCommand::ProcStat => Self::exec_program(session, "cat", &["/proc/stat"]).await,
+            RemoteCommand::ProcMeminfo => {
+                Self::exec_program(session, "cat", &["/proc/meminfo"]).await
+            }
+            RemoteCommand::ProcLoadavg => {
+                Self::exec_program(session, "cat", &["/proc/loadavg"]).await
+            }
+            RemoteCommand::ProcUptime => {
+                Self::exec_program(session, "cat", &["/proc/uptime"]).await
+            }
+            RemoteCommand::ProcNetDev => {
+                Self::exec_program(session, "cat", &["/proc/net/dev"]).await
+            }
+            RemoteCommand::ProcDiskstats => {
+                Self::exec_program(session, "cat", &["/proc/diskstats"]).await
+            }
+            RemoteCommand::Df => Self::exec_program(session, "df", &["-P"]).await,
+            RemoteCommand::Ps => {
+                Self::exec_program(
+                    session,
+                    "ps",
+                    &["-eo", "pid,ppid,user,stat,pcpu,pmem,rss,args"],
+                )
+                .await
+            }
+            RemoteCommand::Uname => Self::exec_program(session, "uname", &["-a"]).await,
+        }
+    }
+
+    async fn exec_with_reconnect(
+        &self,
+        host: &HostConfig,
+        command: RemoteCommand,
+    ) -> Result<String, AppError> {
+        let session = self.session_for(host).await?;
+        match Self::exec_remote_command(&session, command).await {
+            Ok(output) => Ok(output),
+            Err(error) if should_retry_with_fresh_session(&error) => {
+                self.drop_cached_session(&host.id)?;
+                let session = self.session_for(host).await?;
+                Self::exec_remote_command(&session, command).await
+            }
+            Err(error) => Err(error),
+        }
+    }
+
+    async fn collect_metrics_with_reconnect(
+        &self,
+        host: &HostConfig,
+        mode: MetricsBatchMode,
+    ) -> Result<RemoteMetricsOutput, AppError> {
+        let session = self.session_for(host).await?;
+        match Self::exec_metrics_batch(&session, mode).await {
+            Ok(output) => Ok(output),
+            Err(error) if should_retry_with_fresh_session(&error) => {
+                self.drop_cached_session(&host.id)?;
+                let session = self.session_for(host).await?;
+                Self::exec_metrics_batch(&session, mode).await
+            }
+            Err(error) => Err(error),
+        }
+    }
+
+    async fn exec_metrics_batch(
+        session: &Session,
+        mode: MetricsBatchMode,
+    ) -> Result<RemoteMetricsOutput, AppError> {
+        let script = match mode {
+            MetricsBatchMode::Fast => FAST_METRICS_SCRIPT,
+            MetricsBatchMode::Full => FULL_METRICS_SCRIPT,
+        };
+
+        parse_metrics_batch_output(&Self::exec_shell(session, script).await?, mode)
+    }
+}
+
+#[async_trait]
+impl SshClient for OpenSshClient {
+    async fn test_connection(&self, host: &HostConfig) -> Result<ConnectionInfo, AppError> {
+        let started = Instant::now();
+        let session = self.session_for(host).await?;
+        let hostname = Self::exec_program(&session, "hostname", &[])
+            .await
+            .map(|value| value.trim().to_string())?;
+        let uname = Self::exec_program(&session, "uname", &["-srm"])
+            .await
+            .map(|value| value.trim().to_string())?;
+        let os = Self::exec_program(&session, "cat", &["/etc/os-release"])
+            .await
+            .ok()
+            .and_then(|value| parse_pretty_name(&value))
+            .unwrap_or_else(|| uname.clone());
+
+        Ok(ConnectionInfo {
+            ok: true,
+            latency_ms: started.elapsed().as_millis() as u64,
+            hostname,
+            os,
+            kernel: Some(uname),
+            fingerprint: None,
+        })
+    }
+
+    async fn exec(&self, host: &HostConfig, command: RemoteCommand) -> Result<String, AppError> {
+        self.exec_with_reconnect(host, command).await
+    }
+
+    fn disconnect_host(&self, host_id: &str) -> Result<(), AppError> {
+        self.drop_cached_session(host_id)
+    }
+
+    async fn collect_metrics(
+        &self,
+        host: &HostConfig,
+        mode: MetricsBatchMode,
+    ) -> Result<RemoteMetricsOutput, AppError> {
+        self.collect_metrics_with_reconnect(host, mode).await
+    }
+}
+
+fn output_to_string(output: std::process::Output) -> Result<String, AppError> {
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        return Err(
+            AppError::new(AppErrorCode::RemoteCommandFailed, "Remote command failed").with_detail(
+                if stderr.is_empty() {
+                    format!("exitStatus={}", output.status)
+                } else {
+                    stderr
+                },
+            ),
+        );
+    }
+
+    String::from_utf8(output.stdout).map_err(|err| {
+        AppError::new(
+            AppErrorCode::ParserFailed,
+            "Remote output was not valid UTF-8",
+        )
+        .with_detail(err.to_string())
+    })
+}
+
+fn should_retry_with_fresh_session(error: &AppError) -> bool {
+    error.code == AppErrorCode::SshConnectFailed.as_str()
+}
+
+const FAST_METRICS_SCRIPT: &str = r#"
+set -e
+section() { printf '\n__VPSCOPE_SECTION:%s__\n' "$1"; }
+section loadavg
+cat /proc/loadavg
+section uptime
+cat /proc/uptime
+section proc_stat
+cat /proc/stat
+section meminfo
+cat /proc/meminfo
+section net_dev
+cat /proc/net/dev
+section diskstats
+cat /proc/diskstats
+"#;
+
+const FULL_METRICS_SCRIPT: &str = r#"
+set -e
+section() { printf '\n__VPSCOPE_SECTION:%s__\n' "$1"; }
+section uname
+uname -a
+section loadavg
+cat /proc/loadavg
+section uptime
+cat /proc/uptime
+section proc_stat
+cat /proc/stat
+section meminfo
+cat /proc/meminfo
+section df
+df -P
+section net_dev
+cat /proc/net/dev
+section diskstats
+cat /proc/diskstats
+section ps
+ps -eo pid,ppid,user,stat,pcpu,pmem,rss,args
+"#;
+
+fn parse_metrics_batch_output(
+    input: &str,
+    mode: MetricsBatchMode,
+) -> Result<RemoteMetricsOutput, AppError> {
+    let sections = split_metrics_sections(input);
+
+    Ok(RemoteMetricsOutput {
+        uname: optional_section(&sections, "uname", mode)?,
+        loadavg: required_section(&sections, "loadavg")?,
+        uptime: required_section(&sections, "uptime")?,
+        proc_stat: required_section(&sections, "proc_stat")?,
+        meminfo: required_section(&sections, "meminfo")?,
+        df: optional_section(&sections, "df", mode)?,
+        net_dev: required_section(&sections, "net_dev")?,
+        diskstats: required_section(&sections, "diskstats")?,
+        ps: optional_section(&sections, "ps", mode)?,
+    })
+}
+
+fn split_metrics_sections(input: &str) -> HashMap<String, String> {
+    let mut sections = HashMap::new();
+    let mut current = None::<String>;
+
+    for line in input.lines() {
+        if let Some(section) = parse_section_marker(line.trim()) {
+            sections.entry(section.clone()).or_insert_with(String::new);
+            current = Some(section);
+            continue;
+        }
+
+        let Some(section) = current.as_ref() else {
+            continue;
+        };
+        if let Some(value) = sections.get_mut(section) {
+            value.push_str(line);
+            value.push('\n');
+        }
+    }
+
+    sections
+}
+
+fn parse_section_marker(line: &str) -> Option<String> {
+    line.strip_prefix("__VPSCOPE_SECTION:")
+        .and_then(|value| value.strip_suffix("__"))
+        .map(str::to_string)
+}
+
+fn required_section(
+    sections: &HashMap<String, String>,
+    name: &'static str,
+) -> Result<String, AppError> {
+    sections
+        .get(name)
+        .map(|value| value.trim_end_matches('\n').to_string())
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| {
+            AppError::new(
+                AppErrorCode::ParserFailed,
+                format!("Metrics batch is missing {name}"),
+            )
+        })
+}
+
+fn optional_section(
+    sections: &HashMap<String, String>,
+    name: &'static str,
+    mode: MetricsBatchMode,
+) -> Result<Option<String>, AppError> {
+    if mode.includes_slow_metrics() {
+        return required_section(sections, name).map(Some);
+    }
+
+    Ok(None)
+}
+
+fn map_openssh_connect_error(error: openssh::Error) -> AppError {
+    match &error {
+        openssh::Error::Connect(io) | openssh::Error::Master(io) => {
+            let code = match io.kind() {
+                ErrorKind::PermissionDenied => AppErrorCode::SshAuthFailed,
+                _ => AppErrorCode::SshConnectFailed,
+            };
+            AppError::new(code, "SSH connection failed").with_detail(io.to_string())
+        }
+        openssh::Error::Ssh(io) => AppError::new(
+            AppErrorCode::SshConnectFailed,
+            "Local ssh command could not be executed",
+        )
+        .with_detail(io.to_string()),
+        _ => AppError::new(AppErrorCode::SshConnectFailed, "SSH connection failed")
+            .with_detail(error.to_string()),
+    }
+}
+
+fn map_openssh_command_error(error: openssh::Error) -> AppError {
+    match &error {
+        openssh::Error::Remote(io) => AppError::new(
+            AppErrorCode::RemoteCommandFailed,
+            "Remote command could not be executed",
+        )
+        .with_detail(io.to_string()),
+        openssh::Error::Disconnected | openssh::Error::RemoteProcessTerminated => AppError::new(
+            AppErrorCode::SshConnectFailed,
+            "SSH connection was interrupted",
+        )
+        .with_detail(error.to_string()),
+        _ => AppError::new(AppErrorCode::RemoteCommandFailed, "Remote command failed")
+            .with_detail(error.to_string()),
+    }
+}
+
+fn parse_pretty_name(input: &str) -> Option<String> {
+    input.lines().find_map(|line| {
+        let value = line.strip_prefix("PRETTY_NAME=")?;
+        Some(value.trim_matches('"').to_string())
+    })
+}
+
+pub type DynSshClient = Arc<dyn SshClient>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_full_metrics_batch_sections() {
+        let output = parse_metrics_batch_output(
+            r#"
+__VPSCOPE_SECTION:uname__
+Linux vps 6.8.0-71-generic x86_64
+__VPSCOPE_SECTION:loadavg__
+0.12 0.34 0.56 1/234 5678
+__VPSCOPE_SECTION:uptime__
+12345.67 8910.11
+__VPSCOPE_SECTION:proc_stat__
+cpu  1 2 3 4
+__VPSCOPE_SECTION:meminfo__
+MemTotal: 1000 kB
+__VPSCOPE_SECTION:df__
+Filesystem 1024-blocks Used Available Capacity Mounted on
+/dev/vda1 1000 100 900 10% /
+__VPSCOPE_SECTION:net_dev__
+Inter-| Receive | Transmit
+eth0: 1 0 0 0 0 0 0 0 2 0 0 0 0 0 0 0
+__VPSCOPE_SECTION:diskstats__
+253 0 vda 0 0 1 0 0 0 2 0 0 0 0
+__VPSCOPE_SECTION:ps__
+PID PPID USER STAT %CPU %MEM RSS COMMAND
+1 0 root S 0.0 0.1 100 init
+"#,
+            MetricsBatchMode::Full,
+        )
+        .unwrap();
+
+        assert!(output.uname.unwrap().contains("6.8.0"));
+        assert!(output.df.unwrap().contains("/dev/vda1"));
+        assert!(output.ps.unwrap().contains("PID PPID"));
+        assert!(output.net_dev.contains("eth0"));
+    }
+
+    #[test]
+    fn parses_fast_metrics_batch_without_slow_sections() {
+        let output = parse_metrics_batch_output(
+            r#"
+__VPSCOPE_SECTION:loadavg__
+0.12 0.34 0.56 1/234 5678
+__VPSCOPE_SECTION:uptime__
+12345.67 8910.11
+__VPSCOPE_SECTION:proc_stat__
+cpu  1 2 3 4
+__VPSCOPE_SECTION:meminfo__
+MemTotal: 1000 kB
+__VPSCOPE_SECTION:net_dev__
+Inter-| Receive | Transmit
+eth0: 1 0 0 0 0 0 0 0 2 0 0 0 0 0 0 0
+__VPSCOPE_SECTION:diskstats__
+253 0 vda 0 0 1 0 0 0 2 0 0 0 0
+"#,
+            MetricsBatchMode::Fast,
+        )
+        .unwrap();
+
+        assert!(output.uname.is_none());
+        assert!(output.df.is_none());
+        assert!(output.ps.is_none());
+        assert!(output.diskstats.contains("vda"));
+    }
+
+    #[tokio::test]
+    async fn openssh_client_can_connect_to_configured_host_when_enabled() {
+        let Ok(address) = std::env::var("VPSCOPE_TEST_SSH_HOST") else {
+            return;
+        };
+        let username =
+            std::env::var("VPSCOPE_TEST_SSH_USER").unwrap_or_else(|_| "ubuntu".to_string());
+        let host = HostConfig {
+            id: "ssh-test".to_string(),
+            name: address.clone(),
+            address,
+            port: 22,
+            auth: HostAuth::SshAgent { username },
+            refresh_interval_ms: 2_000,
+            tags: Vec::new(),
+            created_at: 0,
+            updated_at: 0,
+        };
+
+        let client = OpenSshClient::new();
+        let connection = client.test_connection(&host).await.unwrap();
+        assert!(connection.ok);
+        assert!(!connection.hostname.is_empty());
+
+        let loadavg = client
+            .exec(&host, RemoteCommand::ProcLoadavg)
+            .await
+            .unwrap();
+        assert!(loadavg.split_whitespace().count() >= 3);
+    }
+}
