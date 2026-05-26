@@ -15,6 +15,7 @@ export function ProcessPanel({ processes }: ProcessPanelProps) {
 
   return (
     <MetricPanel
+      panelId="process"
       title={t("processes")}
       accent="var(--color-danger)"
       status={t("rows", { count: processes.length })}

@@ -23,7 +23,12 @@ export function NetworkPanel({ snapshot, rxHistory, txHistory }: NetworkPanelPro
   const maxIfaceRate = Math.max(1, ...snapshot.network.map((iface) => iface.rxBytesPerSec + iface.txBytesPerSec));
 
   return (
-    <MetricPanel title={t("network")} accent="var(--color-network-rx)" status={t("ifaces", { count: snapshot.network.length })}>
+    <MetricPanel
+      panelId="network"
+      title={t("network")}
+      accent="var(--color-network-rx)"
+      status={t("ifaces", { count: snapshot.network.length })}
+    >
       <div className="grid h-full min-h-0 grid-rows-[auto_auto_minmax(0,1fr)] gap-3">
         <div className="grid min-h-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2">
           <div className="grid min-h-0 grid-rows-[auto_48px] gap-2 rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] p-2">

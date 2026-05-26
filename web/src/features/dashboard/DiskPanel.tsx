@@ -51,7 +51,7 @@ export function DiskPanel({ snapshot }: DiskPanelProps) {
   );
 
   return (
-    <MetricPanel title={t("disks")} accent="var(--color-disk)" status={formatPercent(worstUsedPercent)}>
+    <MetricPanel panelId="disk" title={t("disks")} accent="var(--color-disk)" status={formatPercent(worstUsedPercent)}>
       <div className="scrollbar-none grid h-full min-h-0 content-start gap-2 overflow-auto pr-1">
         {diskItems.map((disk) => {
           const usedPercent = percent(disk.usedBytes, disk.totalBytes);

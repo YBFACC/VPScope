@@ -4,6 +4,66 @@ import { applyTheme } from "@/theme/applyTheme";
 import { getThemeById, type ThemeId } from "@/theme/presets";
 import type { ProcessListPayload } from "@/types/contracts";
 
+export const dashboardPanelIds = ["cpu", "memory", "network", "disk", "process"] as const;
+
+export type DashboardPanelId = (typeof dashboardPanelIds)[number];
+
+const collapsedPanelsStorageKey = "vpscope-collapsed-panels";
+const panelOrderStorageKey = "vpscope-panel-order";
+const dashboardPanelIdSet = new Set<DashboardPanelId>(dashboardPanelIds);
+
+type PanelMoveDirection = "up" | "down";
+
+function readCollapsedPanels() {
+  try {
+    const rawValue = localStorage.getItem(collapsedPanelsStorageKey);
+    const parsedValue: unknown = rawValue ? JSON.parse(rawValue) : [];
+
+    if (!Array.isArray(parsedValue)) {
+      return [];
+    }
+
+    return parsedValue.filter((panelId): panelId is DashboardPanelId => dashboardPanelIdSet.has(panelId as DashboardPanelId));
+  } catch {
+    return [];
+  }
+}
+
+function writeCollapsedPanels(collapsedPanels: DashboardPanelId[]) {
+  localStorage.setItem(collapsedPanelsStorageKey, JSON.stringify(collapsedPanels));
+}
+
+function normalizePanelOrder(candidateOrder: DashboardPanelId[]) {
+  const uniqueKnownPanelIds = candidateOrder.filter(
+    (panelId, index): panelId is DashboardPanelId =>
+      dashboardPanelIdSet.has(panelId) && candidateOrder.indexOf(panelId) === index,
+  );
+  const missingPanelIds = dashboardPanelIds.filter((panelId) => !uniqueKnownPanelIds.includes(panelId));
+
+  return [...uniqueKnownPanelIds, ...missingPanelIds];
+}
+
+function readPanelOrder() {
+  try {
+    const rawValue = localStorage.getItem(panelOrderStorageKey);
+    const parsedValue: unknown = rawValue ? JSON.parse(rawValue) : dashboardPanelIds;
+
+    if (!Array.isArray(parsedValue)) {
+      return [...dashboardPanelIds];
+    }
+
+    return normalizePanelOrder(
+      parsedValue.filter((panelId): panelId is DashboardPanelId => dashboardPanelIdSet.has(panelId as DashboardPanelId)),
+    );
+  } catch {
+    return [...dashboardPanelIds];
+  }
+}
+
+function writePanelOrder(panelOrder: DashboardPanelId[]) {
+  localStorage.setItem(panelOrderStorageKey, JSON.stringify(panelOrder));
+}
+
 type UiStore = {
   themeId: ThemeId;
   locale: Locale;
@@ -13,6 +73,8 @@ type UiStore = {
   processSortDirection: ProcessListPayload["sortDirection"];
   focusedProcessIndex: number;
   settingsOpen: boolean;
+  collapsedPanels: DashboardPanelId[];
+  panelOrder: DashboardPanelId[];
   setTheme: (themeId: ThemeId) => void;
   setLocale: (locale: Locale) => void;
   setViewMode: (viewMode: "overview" | "list") => void;
@@ -20,10 +82,16 @@ type UiStore = {
   setProcessSort: (sortBy: ProcessListPayload["sortBy"]) => void;
   moveFocusedProcess: (delta: number, rowCount: number) => void;
   setSettingsOpen: (settingsOpen: boolean) => void;
+  togglePanelCollapsed: (panelId: DashboardPanelId) => void;
+  showAllPanels: () => void;
+  movePanel: (panelId: DashboardPanelId, direction: PanelMoveDirection) => void;
+  resetPanelOrder: () => void;
 };
 
 const initialTheme = getThemeById(localStorage.getItem("vpscope-theme"));
 const initialLocale = (localStorage.getItem("vpscope-locale") === "en-US" ? "en-US" : "zh-CN") satisfies Locale;
+const initialCollapsedPanels = readCollapsedPanels();
+const initialPanelOrder = readPanelOrder();
 
 export const useUiStore = create<UiStore>((set, get) => ({
   themeId: initialTheme.id,
@@ -34,6 +102,8 @@ export const useUiStore = create<UiStore>((set, get) => ({
   processSortDirection: "desc",
   focusedProcessIndex: 0,
   settingsOpen: false,
+  collapsedPanels: initialCollapsedPanels,
+  panelOrder: initialPanelOrder,
   setTheme(themeId) {
     applyTheme(getThemeById(themeId));
     set({ themeId });
@@ -62,5 +132,45 @@ export const useUiStore = create<UiStore>((set, get) => ({
   },
   setSettingsOpen(settingsOpen) {
     set({ settingsOpen });
+  },
+  togglePanelCollapsed(panelId) {
+    set((state) => {
+      const collapsedPanels = state.collapsedPanels.includes(panelId)
+        ? state.collapsedPanels.filter((candidate) => candidate !== panelId)
+        : [...state.collapsedPanels, panelId];
+
+      writeCollapsedPanels(collapsedPanels);
+      return { collapsedPanels };
+    });
+  },
+  showAllPanels() {
+    writeCollapsedPanels([]);
+    set({ collapsedPanels: [] });
+  },
+  movePanel(panelId, direction) {
+    set((state) => {
+      const panelOrder = normalizePanelOrder(state.panelOrder);
+      const hiddenPanelIds = new Set(state.collapsedPanels);
+      const visiblePanelOrder = panelOrder.filter((candidate) => !hiddenPanelIds.has(candidate));
+      const currentVisibleIndex = visiblePanelOrder.indexOf(panelId);
+      const targetVisibleIndex = direction === "up" ? currentVisibleIndex - 1 : currentVisibleIndex + 1;
+      const targetPanelId = visiblePanelOrder[targetVisibleIndex];
+      const currentIndex = panelOrder.indexOf(panelId);
+      const targetIndex = targetPanelId ? panelOrder.indexOf(targetPanelId) : -1;
+
+      if (currentIndex < 0 || targetIndex < 0) {
+        return { panelOrder };
+      }
+
+      const nextPanelOrder = [...panelOrder];
+      [nextPanelOrder[currentIndex], nextPanelOrder[targetIndex]] = [nextPanelOrder[targetIndex], nextPanelOrder[currentIndex]];
+      writePanelOrder(nextPanelOrder);
+      return { panelOrder: nextPanelOrder };
+    });
+  },
+  resetPanelOrder() {
+    const panelOrder = [...dashboardPanelIds];
+    writePanelOrder(panelOrder);
+    set({ panelOrder });
   },
 }));

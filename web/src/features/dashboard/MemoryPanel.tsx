@@ -19,7 +19,7 @@ export function MemoryPanel({ snapshot, history }: MemoryPanelProps) {
     snapshot.memory.swapTotalBytes > 0 ? (snapshot.memory.swapUsedBytes / snapshot.memory.swapTotalBytes) * 100 : 0;
 
   return (
-    <MetricPanel title={t("memory")} accent="var(--color-memory)" status={formatPercent(usedPercent)}>
+    <MetricPanel panelId="memory" title={t("memory")} accent="var(--color-memory)" status={formatPercent(usedPercent)}>
       <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-3">
         <div className="grid min-h-0 grid-cols-[94px_minmax(0,1fr)] gap-3">
           <UsageRing

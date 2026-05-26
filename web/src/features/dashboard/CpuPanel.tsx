@@ -21,7 +21,7 @@ export function CpuPanel({ snapshot, history }: CpuPanelProps) {
       : snapshot.cpu.totalPercent;
 
   return (
-    <MetricPanel title={t("cpu")} accent="var(--color-cpu)" status={formatPercent(snapshot.cpu.totalPercent)}>
+    <MetricPanel panelId="cpu" title={t("cpu")} accent="var(--color-cpu)" status={formatPercent(snapshot.cpu.totalPercent)}>
       <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-3">
         <div className="grid min-h-0 grid-cols-[94px_minmax(0,1fr)] gap-3">
           <UsageRing value={snapshot.cpu.totalPercent} label={t("cpu")} color="var(--color-cpu)" size={92} />
