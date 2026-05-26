@@ -186,12 +186,14 @@ export function HostSidebar() {
 
   return (
     <aside className="grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-2 overflow-hidden rounded-[var(--radius-panel)] border border-[var(--color-border)] bg-[var(--color-panel-glass)] p-3 shadow-[var(--shadow-panel)] backdrop-blur">
-      <div className="min-w-0">
-        <div className="flex items-center gap-2 font-mono text-sm font-semibold text-[var(--color-text)]">
-          <span className="h-2 w-2 rounded-full bg-[var(--color-accent)] shadow-[var(--shadow-glow)]" />
-          {t("hosts")}
+      <div className="flex min-w-0 items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2 font-mono text-sm font-semibold text-[var(--color-text)]">
+          <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--color-accent)] shadow-[var(--shadow-glow)]" />
+          <span className="min-w-0 truncate">{t("hosts")}</span>
         </div>
-        <div className="mt-1 font-mono text-[11px] text-[var(--color-text-muted)]">{t("hostsConfigured", { count: hosts.length })}</div>
+        <div className="shrink-0 whitespace-nowrap text-right font-mono text-[11px] text-[var(--color-text-muted)]">
+          {t("hostsConfigured", { count: hosts.length })}
+        </div>
       </div>
 
       <div className="scrollbar-none min-h-0 min-w-0 space-y-1.5 overflow-auto">
