@@ -141,7 +141,7 @@ export function SettingsPage() {
 
   return (
     <div className="fixed inset-0 z-30 grid place-items-center bg-[var(--color-overlay)] p-4 backdrop-blur-sm">
-      <section className="grid max-h-[min(620px,calc(100vh-2rem))] w-full max-w-3xl grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-[var(--radius-panel)] border border-[var(--color-border-strong)] bg-[var(--color-panel-glass)] shadow-[var(--shadow-panel)] backdrop-blur">
+      <section className="grid h-[min(620px,calc(100vh-2rem))] w-full max-w-3xl grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-[var(--radius-panel)] border border-[var(--color-border-strong)] bg-[var(--color-panel-glass)] shadow-[var(--shadow-panel)] backdrop-blur">
         <div className="flex items-center justify-between gap-3 bg-[var(--color-panel-raised)]">
           <h2 className="px-4 py-3 font-mono text-base font-semibold text-[var(--color-text)]">
             <span className="mr-2 inline-block h-2 w-2 rounded-full bg-[var(--color-accent)] shadow-[var(--shadow-glow)]" />
@@ -168,13 +168,13 @@ export function SettingsPage() {
           </button>
         </div>
         <div className="grid min-h-0 border-t border-[var(--color-border)] md:grid-cols-[180px_minmax(0,1fr)]">
-          <nav className="flex gap-1 border-b border-[var(--color-border)] bg-[var(--color-panel-muted)] p-2 md:grid md:border-b-0 md:border-r">
+          <nav className="flex gap-1 border-b border-[var(--color-border)] bg-[var(--color-panel-muted)] p-2 md:flex-col md:items-stretch md:border-b-0 md:border-r">
             {(["appearance", "menuBar", "alerts"] as const).map((candidate) => (
               <button
                 key={candidate}
                 type="button"
                 onClick={() => setSection(candidate)}
-                className="h-9 rounded-[var(--radius-control)] border border-transparent px-3 text-left font-mono text-xs text-[var(--color-text-muted)] hover:bg-[var(--color-row-hover)] data-[active=true]:border-[var(--color-border-subtle)] data-[active=true]:bg-[var(--color-input)] data-[active=true]:text-[var(--color-text)]"
+                className="h-9 shrink-0 rounded-[var(--radius-control)] border border-transparent px-3 text-left font-mono text-xs text-[var(--color-text-muted)] hover:bg-[var(--color-row-hover)] data-[active=true]:border-[var(--color-border-subtle)] data-[active=true]:bg-[var(--color-input)] data-[active=true]:text-[var(--color-text)]"
                 data-active={candidate === section}
               >
                 {candidate === "appearance" ? t("appearance") : candidate === "menuBar" ? t("menuBar") : t("alerts")}
