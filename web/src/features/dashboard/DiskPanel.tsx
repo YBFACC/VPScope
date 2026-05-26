@@ -65,13 +65,13 @@ export function DiskPanel({ snapshot }: DiskPanelProps) {
             >
               <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2 font-mono">
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-semibold leading-none text-[var(--color-text)]" title={disk.label}>
+                  <div className="truncate text-xs font-semibold leading-none text-[var(--color-text)]" title={disk.label}>
                     {disk.label}
                   </div>
                   <div className="mt-1 truncate text-[11px] text-[var(--color-text-muted)]">{disk.detail}</div>
                 </div>
                 <div className="grid gap-1 text-right leading-none">
-                  <span className="text-sm text-[var(--color-disk)] tabular-nums">{formatPercent(usedPercent)}</span>
+                  <span className="text-xs text-[var(--color-disk)] tabular-nums">{formatPercent(usedPercent)}</span>
                   <span className="text-[11px] text-[var(--color-text-muted)] tabular-nums">{formatBytes(disk.totalBytes)}</span>
                 </div>
               </div>

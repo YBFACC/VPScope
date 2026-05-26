@@ -47,7 +47,7 @@ export function UsageRing({
         />
       </svg>
       <div className="grid min-w-0 place-items-center gap-1 text-center font-mono">
-        <div className="text-3xl font-semibold leading-none text-[var(--color-text)] tabular-nums">
+        <div className="text-xl font-semibold leading-none text-[var(--color-text)] tabular-nums">
           {formatPercent(clamped)}
         </div>
         <div className="max-w-20 truncate text-[10px] uppercase text-[var(--color-text-muted)]">{label}</div>
