@@ -1,4 +1,5 @@
 import { useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { HostConnectionBadge } from "@/features/hosts/HostConnectionBadge";
 import { HostForm } from "@/features/hosts/HostForm";
 import { useI18n } from "@/i18n/useI18n";
@@ -90,7 +91,7 @@ function HostDetailsTooltip({ host, snapshot, connection }: HostDetailsTooltipPr
       >
         i
       </button>
-      {isOpen ? (
+      {isOpen ? createPortal(
         <div
           id={tooltipId}
           role="tooltip"
@@ -119,7 +120,8 @@ function HostDetailsTooltip({ host, snapshot, connection }: HostDetailsTooltipPr
               <span className="tabular-nums">{connection.lastError.code}</span>: {connection.lastError.message}
             </div>
           ) : null}
-        </div>
+        </div>,
+        document.body,
       ) : null}
     </div>
   );
