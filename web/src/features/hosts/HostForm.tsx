@@ -5,7 +5,7 @@ import { useHostStore } from "@/stores/hostStore";
 import type { HostAuth, HostCreatePayload, SshConfigHost } from "@/types/contracts";
 
 const inputClass =
-  "h-8 min-w-0 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-input)] px-2 font-mono text-xs text-[var(--color-text)] outline-none focus:border-[var(--color-border-strong)]";
+  "h-8 min-w-0 rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] px-2 font-mono text-xs text-[var(--color-text)] outline-none focus:border-[var(--color-border-strong)]";
 
 type HostFormProps = {
   open: boolean;
@@ -124,19 +124,22 @@ export function HostForm({ open, onClose }: HostFormProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-40 grid place-items-center bg-[var(--color-overlay)] p-4">
+    <div className="fixed inset-0 z-40 grid place-items-center bg-[var(--color-overlay)] p-4 backdrop-blur-sm">
       <form
         onSubmit={onSubmit}
-        className="grid w-full max-w-xl gap-3 rounded-[var(--radius-panel)] border border-[var(--color-border-strong)] bg-[var(--color-panel)] p-4 shadow-[var(--shadow-panel)]"
+        className="grid w-full max-w-xl gap-3 rounded-[var(--radius-panel)] border border-[var(--color-border-strong)] bg-[var(--color-panel-glass)] p-4 shadow-[var(--shadow-panel)] backdrop-blur"
       >
         <div className="flex items-center justify-between gap-3">
-          <h2 className="font-mono text-base font-semibold text-[var(--color-text)]">{t("addHost")}</h2>
+          <h2 className="font-mono text-base font-semibold text-[var(--color-text)]">
+            <span className="mr-2 inline-block h-2 w-2 rounded-full bg-[var(--color-accent)] shadow-[var(--shadow-glow)]" />
+            {t("addHost")}
+          </h2>
           <button type="button" onClick={onClose} className="control-button">
             {t("close")}
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-input)] p-1">
+        <div className="grid grid-cols-2 gap-2 rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] p-1">
           <button
             type="button"
             onClick={() => setMode("manual")}
@@ -158,7 +161,7 @@ export function HostForm({ open, onClose }: HostFormProps) {
         {mode === "sshConfig" ? (
           <div className="grid gap-2">
             {sshConfigHosts.length === 0 ? (
-              <div className="rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-input)] p-3 font-mono text-xs text-[var(--color-text-muted)]">
+              <div className="rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] p-3 font-mono text-xs text-[var(--color-text-muted)]">
                 {t("noSshConfigHosts")}
               </div>
             ) : (

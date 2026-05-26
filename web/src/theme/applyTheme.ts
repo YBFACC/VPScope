@@ -3,9 +3,12 @@ import type { VPScopeTheme } from "./types";
 const tokenMap = {
   bg: "--color-bg",
   panel: "--color-panel",
+  panelRaised: "--color-panel-raised",
   panelMuted: "--color-panel-muted",
+  panelGlass: "--color-panel-glass",
   border: "--color-border",
   borderStrong: "--color-border-strong",
+  borderSubtle: "--color-border-subtle",
   text: "--color-text",
   textMuted: "--color-text-muted",
   cpu: "--color-cpu",
@@ -16,12 +19,16 @@ const tokenMap = {
   warning: "--color-warning",
   danger: "--color-danger",
   accent: "--color-accent",
+  accentSoft: "--color-accent-soft",
   chartGrid: "--color-chart-grid",
+  chartFill: "--color-chart-fill",
   barTrack: "--color-bar-track",
   rowHover: "--color-row-hover",
   shadow: "--shadow-panel",
+  glow: "--shadow-glow",
   input: "--color-input",
   overlay: "--color-overlay",
+  noise: "--color-noise",
 } as const;
 
 export function applyTheme(theme: VPScopeTheme) {

@@ -17,7 +17,6 @@ import {
 import { trayHostIds, useTraySettingsStore } from "@/stores/traySettingsStore";
 import { useUiStore } from "@/stores/uiStore";
 import { CpuPanel } from "./CpuPanel";
-import { DetailsPanel } from "./DetailsPanel";
 import { DiskPanel } from "./DiskPanel";
 import { MemoryPanel } from "./MemoryPanel";
 import { NetworkPanel } from "./NetworkPanel";
@@ -206,7 +205,7 @@ export function DashboardPage() {
   }, [moveFocusedProcess, processes.length, setProcessSort, setSearch]);
 
   return (
-    <main className="h-screen overflow-hidden bg-[var(--color-bg)] p-2 text-[var(--color-text)] lg:p-3">
+    <main className="cockpit-surface h-screen overflow-hidden bg-[var(--color-bg)] p-2 text-[var(--color-text)] lg:p-3">
       <div className="grid h-full w-full grid-rows-[auto_minmax(0,1fr)] gap-2 lg:gap-3">
         <TopToolbar />
 
@@ -251,7 +250,6 @@ export function DashboardPage() {
                 <MemoryPanel snapshot={snapshot} history={history?.memory ?? []} />
                 <NetworkPanel snapshot={snapshot} rxHistory={history?.rx ?? []} txHistory={history?.tx ?? []} />
                 <DiskPanel snapshot={snapshot} />
-                <DetailsPanel host={selectedHost} snapshot={snapshot} connection={connection} />
                 <ProcessPanel processes={processes} />
               </div>
             )}

@@ -65,8 +65,8 @@ export function ProcessTable({ processes }: ProcessTableProps) {
   });
 
   return (
-    <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-[var(--radius-control)] border border-[var(--color-border)]">
-      <div className="grid grid-cols-[64px_minmax(90px,0.7fr)_minmax(76px,0.55fr)_78px_92px_minmax(160px,1.8fr)] bg-[var(--color-panel-muted)] font-mono text-[11px] text-[var(--color-text-muted)]">
+    <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)]">
+      <div className="grid grid-cols-[64px_minmax(90px,0.7fr)_minmax(76px,0.55fr)_78px_92px_minmax(160px,1.8fr)] border-b border-[var(--color-border)] bg-[var(--color-panel-muted)] font-mono text-[11px] text-[var(--color-text-muted)] shadow-[inset_0_-1px_0_var(--color-border-subtle)]">
         {columns.map((column) => (
           <button
             key={column.key}
@@ -77,7 +77,7 @@ export function ProcessTable({ processes }: ProcessTableProps) {
               }
               setProcessSort(column.key === "memory" ? "memory" : column.key === "cpu" ? "cpu" : column.key === "pid" ? "pid" : "name");
             }}
-            className={clsx("min-w-0 truncate px-2 py-1.5 text-left", column.className)}
+            className={clsx("min-w-0 truncate px-2 py-1.5 text-left hover:text-[var(--color-text)]", column.className)}
           >
             {t(column.labelKey)}
             {sortBy === column.key ? <span className="ml-1 text-[var(--color-accent)]">{sortDirection === "asc" ? "^" : "v"}</span> : null}
@@ -93,7 +93,7 @@ export function ProcessTable({ processes }: ProcessTableProps) {
             return (
               <div
                 key={process.pid}
-                className="absolute left-0 grid w-full grid-cols-[64px_minmax(90px,0.7fr)_minmax(76px,0.55fr)_78px_92px_minmax(160px,1.8fr)] border-t border-[var(--color-border)] font-mono text-[11px] text-[var(--color-text)] data-[active=true]:bg-[var(--color-row-hover)]"
+                className="absolute left-0 grid w-full grid-cols-[64px_minmax(90px,0.7fr)_minmax(76px,0.55fr)_78px_92px_minmax(160px,1.8fr)] border-t border-[var(--color-border-subtle)] font-mono text-[11px] text-[var(--color-text)] data-[active=true]:bg-[var(--color-row-hover)] data-[active=true]:shadow-[inset_2px_0_0_var(--color-accent)]"
                 data-active={active}
                 style={{ height: `${virtualRow.size}px`, transform: `translateY(${virtualRow.start}px)` }}
               >

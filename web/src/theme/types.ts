@@ -5,9 +5,12 @@ export type VPScopeTheme = {
   colors: {
     bg: string;
     panel: string;
+    panelRaised: string;
     panelMuted: string;
+    panelGlass: string;
     border: string;
     borderStrong: string;
+    borderSubtle: string;
     text: string;
     textMuted: string;
     cpu: string;
@@ -18,12 +21,16 @@ export type VPScopeTheme = {
     warning: string;
     danger: string;
     accent: string;
+    accentSoft: string;
     chartGrid: string;
+    chartFill: string;
     barTrack: string;
     rowHover: string;
     shadow: string;
+    glow: string;
     input: string;
     overlay: string;
+    noise: string;
   };
   radius: {
     panel: string;

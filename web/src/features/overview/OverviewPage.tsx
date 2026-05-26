@@ -80,10 +80,14 @@ function MiniMeter({ value, color }: { value?: number; color: string }) {
   const percent = value === undefined ? 0 : Math.max(0, Math.min(100, value));
 
   return (
-    <div className="h-1.5 min-w-14 overflow-hidden rounded-[var(--radius-control)] bg-[var(--color-bar-track)]">
+    <div className="h-2 min-w-14 overflow-hidden rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-bar-track)]">
       <div
         className="h-full rounded-[var(--radius-control)] transition-[width] duration-300"
-        style={{ width: `${percent}%`, backgroundColor: value === undefined ? "var(--color-border)" : color }}
+        style={{
+          width: `${percent}%`,
+          backgroundColor: value === undefined ? "var(--color-border)" : color,
+          boxShadow: value === undefined ? undefined : `0 0 12px ${color}`,
+        }}
       />
     </div>
   );
@@ -122,11 +126,12 @@ export function OverviewPage({
   const { t } = useI18n();
 
   return (
-    <section className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-2 overflow-hidden rounded-[var(--radius-panel)] border border-[var(--color-border)] bg-[var(--color-panel)] p-2.5 shadow-[var(--shadow-panel)]">
+    <section className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-2 overflow-hidden rounded-[var(--radius-panel)] border border-[var(--color-border)] bg-[var(--color-panel-glass)] p-3 shadow-[var(--shadow-panel)] backdrop-blur">
       <div className="flex min-h-7 min-w-0 items-center justify-between gap-3">
         <div className="min-w-0">
           <h2 className="truncate font-mono text-sm font-semibold uppercase tracking-normal text-[var(--color-text)]">
-            <span className="text-[var(--color-accent)]">#</span> {t("hostOverview")}
+            <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-[var(--color-accent)] align-middle shadow-[var(--shadow-glow)]" />
+            {t("hostOverview")}
           </h2>
           <div className="truncate font-mono text-[11px] text-[var(--color-text-muted)]">
             {t("hostsConfigured", { count: hosts.length })} · {isSubscribing ? t("connecting") : t("streamingMetrics")}
@@ -168,8 +173,8 @@ export function OverviewPage({
                   }
                 }}
                 className={clsx(
-                  "grid min-h-20 min-w-0 cursor-default grid-cols-[220px_88px_repeat(4,minmax(96px,1fr))_112px] items-center gap-3 rounded-[var(--radius-control)] border bg-[var(--color-input)] p-2.5 font-mono text-xs outline-none",
-                  "border-[var(--color-border)] hover:border-[var(--color-border-strong)] hover:bg-[var(--color-row-hover)] focus:border-[var(--color-accent)]",
+                  "grid min-h-20 min-w-0 cursor-default grid-cols-[220px_88px_repeat(4,minmax(96px,1fr))_112px] items-center gap-3 rounded-[var(--radius-control)] border bg-[var(--color-input)] p-2.5 font-mono text-xs outline-none transition-colors",
+                  "border-[var(--color-border-subtle)] hover:border-[var(--color-border-strong)] hover:bg-[var(--color-row-hover)] focus:border-[var(--color-accent)] focus:shadow-[var(--shadow-glow)]",
                 )}
               >
                 <div className="min-w-0">

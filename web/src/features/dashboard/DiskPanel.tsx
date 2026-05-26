@@ -1,3 +1,4 @@
+import { SegmentedMeter } from "@/components/meter/SegmentedMeter";
 import { MetricPanel } from "@/components/panel/MetricPanel";
 import { useI18n } from "@/i18n/useI18n";
 import { formatBytes, formatPercent, formatRate } from "@/lib/format";
@@ -22,37 +23,6 @@ function percent(usedBytes: number, totalBytes: number) {
   return totalBytes > 0 ? (usedBytes / totalBytes) * 100 : 0;
 }
 
-function DiskUsageBar({ value, color }: { value: number; color: string }) {
-  const clamped = Math.max(0, Math.min(100, value));
-
-  return (
-    <div className="h-2.5 min-w-0 overflow-hidden rounded-[var(--radius-control)] bg-[var(--color-bar-track)]">
-      <div className="h-full rounded-[var(--radius-control)] transition-[width] duration-300" style={{ width: `${clamped}%`, backgroundColor: color }} />
-    </div>
-  );
-}
-
-function DiskUsageRow({
-  label,
-  value,
-  bytes,
-  color,
-}: {
-  label: string;
-  value: number;
-  bytes: number;
-  color: string;
-}) {
-  return (
-    <div className="grid min-w-0 grid-cols-[58px_48px_minmax(0,1fr)_76px] items-center gap-2 font-mono text-[11px] leading-none">
-      <span className="text-[var(--color-text-muted)]">{label}</span>
-      <span className="text-right tabular-nums text-[var(--color-text)]">{formatPercent(value)}</span>
-      <DiskUsageBar value={value} color={color} />
-      <span className="truncate text-right tabular-nums text-[var(--color-text-muted)]">{formatBytes(bytes)}</span>
-    </div>
-  );
-}
-
 export function DiskPanel({ snapshot }: DiskPanelProps) {
   const { t } = useI18n();
   const diskItems: DiskItem[] = [
@@ -74,9 +44,14 @@ export function DiskPanel({ snapshot }: DiskPanelProps) {
       isSwap: true,
     },
   ];
+  const worstUsedPercent = diskItems.reduce((max, disk) => Math.max(max, percent(disk.usedBytes, disk.totalBytes)), 0);
+  const maxIoRate = Math.max(
+    1,
+    ...diskItems.map((disk) => (disk.readBytesPerSec ?? 0) + (disk.writeBytesPerSec ?? 0)),
+  );
 
   return (
-    <MetricPanel title={t("disks")} accent="var(--color-disk)" status={t("mounts", { count: diskItems.length })}>
+    <MetricPanel title={t("disks")} accent="var(--color-disk)" status={formatPercent(worstUsedPercent)}>
       <div className="scrollbar-none grid h-full min-h-0 content-start gap-2 overflow-auto pr-1">
         {diskItems.map((disk) => {
           const usedPercent = percent(disk.usedBytes, disk.totalBytes);
@@ -84,22 +59,67 @@ export function DiskPanel({ snapshot }: DiskPanelProps) {
           const freeBytes = Math.max(0, disk.totalBytes - disk.usedBytes);
 
           return (
-            <div key={disk.id} className="grid min-w-0 gap-1.5 border-b border-[var(--color-border)]/70 pb-2 last:border-b-0 last:pb-0">
-              <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-end gap-2 font-mono">
-                <span className="truncate text-sm font-semibold leading-none text-[var(--color-text)]" title={disk.label}>
-                  {disk.label}
-                </span>
-                <span className="tabular-nums leading-none text-[var(--color-text)]">{formatBytes(disk.totalBytes)}</span>
+            <div
+              key={disk.id}
+              className="grid min-w-0 gap-2 rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] p-2"
+            >
+              <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2 font-mono">
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-semibold leading-none text-[var(--color-text)]" title={disk.label}>
+                    {disk.label}
+                  </div>
+                  <div className="mt-1 truncate text-[11px] text-[var(--color-text-muted)]">{disk.detail}</div>
+                </div>
+                <div className="grid gap-1 text-right leading-none">
+                  <span className="text-sm text-[var(--color-disk)] tabular-nums">{formatPercent(usedPercent)}</span>
+                  <span className="text-[11px] text-[var(--color-text-muted)] tabular-nums">{formatBytes(disk.totalBytes)}</span>
+                </div>
               </div>
-              <DiskUsageRow label={t("used")} value={usedPercent} bytes={disk.usedBytes} color={disk.isSwap ? "var(--color-warning)" : "var(--color-disk)"} />
-              <DiskUsageRow label={t("free")} value={freePercent} bytes={freeBytes} color="var(--color-cpu)" />
-              <div className="grid min-w-0 grid-cols-[58px_minmax(0,1fr)] items-center gap-2 font-mono text-[11px] leading-none text-[var(--color-text-muted)]">
-                <span className="truncate">{disk.detail}</span>
-                <span className="truncate">
-                  {disk.isSwap
-                    ? `${formatBytes(disk.usedBytes)} / ${formatBytes(disk.totalBytes)}`
-                    : `r ${formatRate(disk.readBytesPerSec ?? 0)} · w ${formatRate(disk.writeBytesPerSec ?? 0)}`}
-                </span>
+              <SegmentedMeter
+                label={t("used")}
+                value={usedPercent}
+                detail={formatBytes(disk.usedBytes)}
+                color={disk.isSwap ? "var(--color-warning)" : "var(--color-disk)"}
+                segments={18}
+              />
+              <SegmentedMeter
+                label={t("free")}
+                value={freePercent}
+                detail={formatBytes(freeBytes)}
+                color="var(--color-cpu)"
+                segments={18}
+              />
+              <div className="grid min-w-0 grid-cols-2 gap-2 font-mono text-[11px] leading-none">
+                <div className="grid min-w-0 gap-1">
+                  <div className="flex items-center justify-between gap-2 text-[var(--color-text-muted)]">
+                    <span>{t("read")}</span>
+                    <span className="truncate text-[var(--color-text)] tabular-nums">
+                      {disk.isSwap ? "--" : formatRate(disk.readBytesPerSec ?? 0)}
+                    </span>
+                  </div>
+                  <SegmentedMeter
+                    value={disk.isSwap ? 0 : ((disk.readBytesPerSec ?? 0) / maxIoRate) * 100}
+                    color="var(--color-accent)"
+                    compact
+                    showValue={false}
+                    segments={10}
+                  />
+                </div>
+                <div className="grid min-w-0 gap-1">
+                  <div className="flex items-center justify-between gap-2 text-[var(--color-text-muted)]">
+                    <span>{t("write")}</span>
+                    <span className="truncate text-[var(--color-text)] tabular-nums">
+                      {disk.isSwap ? "--" : formatRate(disk.writeBytesPerSec ?? 0)}
+                    </span>
+                  </div>
+                  <SegmentedMeter
+                    value={disk.isSwap ? 0 : ((disk.writeBytesPerSec ?? 0) / maxIoRate) * 100}
+                    color="var(--color-warning)"
+                    compact
+                    showValue={false}
+                    segments={10}
+                  />
+                </div>
               </div>
             </div>
           );
