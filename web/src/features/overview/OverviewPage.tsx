@@ -93,6 +93,9 @@ function MiniMeter({ value, color }: { value?: number; color: string }) {
   );
 }
 
+const metricHeaderClass = "mb-1 grid h-4 min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-2";
+const metricLabelClass = "truncate text-[10px] uppercase text-[var(--color-text-muted)]";
+
 function MetricCell({
   label,
   value,
@@ -106,11 +109,44 @@ function MetricCell({
 }) {
   return (
     <div className="min-w-0">
-      <div className="mb-1 flex items-center justify-between gap-2">
-        <span className="truncate text-[10px] uppercase text-[var(--color-text-muted)]">{label}</span>
+      <div className={metricHeaderClass}>
+        <span className={metricLabelClass}>{label}</span>
         <span className="shrink-0 tabular-nums text-[var(--color-text)]">{value}</span>
       </div>
       <MiniMeter value={meter} color={color} />
+    </div>
+  );
+}
+
+function NetworkMetricCell({
+  label,
+  rxLabel,
+  txLabel,
+  rxValue,
+  txValue,
+  meter,
+}: {
+  label: string;
+  rxLabel: string;
+  txLabel: string;
+  rxValue: string;
+  txValue: string;
+  meter?: number;
+}) {
+  return (
+    <div className="min-w-0">
+      <div className={metricHeaderClass}>
+        <span className={metricLabelClass}>{label}</span>
+        <div className="flex min-w-0 justify-end gap-2 overflow-hidden tabular-nums">
+          <span className="min-w-0 truncate text-[var(--color-network-rx)]">
+            {rxLabel} {rxValue}
+          </span>
+          <span className="min-w-0 truncate text-[var(--color-network-tx)]">
+            {txLabel} {txValue}
+          </span>
+        </div>
+      </div>
+      <MiniMeter value={meter} color="var(--color-accent)" />
     </div>
   );
 }
@@ -213,18 +249,14 @@ export function OverviewPage({
                   meter={diskPercent}
                   color="var(--color-disk)"
                 />
-                <div className="min-w-0">
-                  <div className="mb-1 text-[10px] uppercase text-[var(--color-text-muted)]">{t("network")}</div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="min-w-0 truncate tabular-nums text-[var(--color-network-rx)]">
-                      {t("rx")} {snapshot ? formatRate(rx) : "--"}
-                    </div>
-                    <div className="min-w-0 truncate tabular-nums text-[var(--color-network-tx)]">
-                      {t("tx")} {snapshot ? formatRate(tx) : "--"}
-                    </div>
-                  </div>
-                  <MiniMeter value={snapshot ? Math.min(100, (rx + tx) / 1024 / 1024) : undefined} color="var(--color-accent)" />
-                </div>
+                <NetworkMetricCell
+                  label={t("network")}
+                  rxLabel={t("rx")}
+                  txLabel={t("tx")}
+                  rxValue={snapshot ? formatRate(rx) : "--"}
+                  txValue={snapshot ? formatRate(tx) : "--"}
+                  meter={snapshot ? Math.min(100, (rx + tx) / 1024 / 1024) : undefined}
+                />
 
                 <div className="grid min-w-0 gap-1 text-right text-[11px] text-[var(--color-text-muted)]">
                   <div className="truncate tabular-nums">
