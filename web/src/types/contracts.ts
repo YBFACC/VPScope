@@ -93,6 +93,21 @@ export type HostDeleteResult = {
   ok: true;
 };
 
+export type TerminalApp = "terminal_app" | "iterm2" | "wezterm" | "ghostty" | "alacritty" | "kitty";
+
+export type TerminalSettings = {
+  app: TerminalApp;
+};
+
+export type HostOpenTerminalPayload = {
+  hostId: HostId;
+};
+
+export type HostOpenTerminalResult = {
+  ok: true;
+  app: TerminalApp;
+};
+
 export type HostTestConnectionPayload = {
   id?: HostId;
   draft?: HostCreatePayload;
@@ -245,6 +260,7 @@ export type VpscopeCommandPayloads = {
   host_create: HostCreatePayload;
   host_update: HostUpdatePayload;
   host_delete: HostDeletePayload;
+  host_open_terminal: HostOpenTerminalPayload;
   host_ssh_config_list: Record<string, never>;
   host_test_connection: HostTestConnectionPayload;
   metrics_last_snapshot: MetricsLastSnapshotPayload;
@@ -255,6 +271,8 @@ export type VpscopeCommandPayloads = {
   tray_settings_update: TraySettings;
   alert_settings_get: Record<string, never>;
   alert_settings_update: { settings: AlertSettings };
+  terminal_settings_get: Record<string, never>;
+  terminal_settings_update: { settings: TerminalSettings };
 };
 
 export type VpscopeCommandResults = {
@@ -262,6 +280,7 @@ export type VpscopeCommandResults = {
   host_create: HostCreateResult;
   host_update: HostUpdateResult;
   host_delete: HostDeleteResult;
+  host_open_terminal: HostOpenTerminalResult;
   host_ssh_config_list: SshConfigHost[];
   host_test_connection: HostTestConnectionResult;
   metrics_last_snapshot: MetricsLastSnapshotResult;
@@ -272,4 +291,6 @@ export type VpscopeCommandResults = {
   tray_settings_update: TraySettings;
   alert_settings_get: AlertSettings;
   alert_settings_update: AlertSettings;
+  terminal_settings_get: TerminalSettings;
+  terminal_settings_update: TerminalSettings;
 };

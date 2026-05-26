@@ -168,10 +168,13 @@ export type VPScopeClient = {
   createHost(payload: HostCreatePayload): Promise<HostConfig>;
   updateHost(payload: HostUpdatePayload): Promise<HostConfig>;
   deleteHost(id: HostId): Promise<void>;
+  openTerminal(hostId: HostId): Promise<HostOpenTerminalResult>;
   testConnection(payload: HostTestConnectionPayload): Promise<HostTestConnectionResult>;
   getLastSnapshot(hostId: HostId): Promise<HostSnapshot | null>;
   subscribeMetrics(payload: MetricsSubscribePayload, onSnapshot: MetricsSnapshotHandler): Promise<() => Promise<void>>;
   listProcesses(payload: ProcessListPayload): Promise<ProcessInfo[]>;
+  getTerminalSettings(): Promise<TerminalSettings>;
+  updateTerminalSettings(settings: TerminalSettings): Promise<TerminalSettings>;
 };
 ```
 
@@ -188,6 +191,7 @@ export type VPScopeClient = {
 
 - `hostStore`: host 列表、当前选中 host、连接状态。
 - `metricsStore`: 当前 snapshot、历史 ring buffer、采集错误。
+- `terminalSettingsStore`: 打开外部终端的普通偏好、打开状态和错误。
 - `uiStore`: 当前主题、聚焦面板、搜索词、排序状态、刷新间隔。
 
 实现要求：

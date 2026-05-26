@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { localeNames, type Locale } from "@/i18n/messages";
+import { localeNames, type Locale, type MessageKey } from "@/i18n/messages";
 import { useI18n } from "@/i18n/useI18n";
 import { createCpuAlertRule } from "@/lib/alerts";
 import {
@@ -14,13 +14,39 @@ import {
   updateTrayItem,
   useTraySettingsStore,
 } from "@/stores/traySettingsStore";
+import { useTerminalSettingsStore } from "@/stores/terminalSettingsStore";
 import { useUiStore } from "@/stores/uiStore";
 import { themePresets, type ThemeId } from "@/theme/presets";
-import type { AlertSettings, HostConfig, TrayItemDisplayMode, TraySettings } from "@/types/contracts";
+import type {
+  AlertSettings,
+  HostConfig,
+  TerminalApp,
+  TerminalSettings,
+  TrayItemDisplayMode,
+  TraySettings,
+} from "@/types/contracts";
 
-type SettingsSection = "appearance" | "menuBar" | "alerts";
+type SettingsSection = "appearance" | "menuBar" | "alerts" | "terminal";
 
 const alertCooldownOptions = [60_000, 300_000, 600_000, 1_800_000, 3_600_000];
+const terminalAppOptions: TerminalApp[] = ["terminal_app", "iterm2", "wezterm", "ghostty", "alacritty", "kitty"];
+
+function terminalAppLabel(app: TerminalApp): MessageKey {
+  switch (app) {
+    case "terminal_app":
+      return "terminalAppName";
+    case "iterm2":
+      return "iterm2";
+    case "wezterm":
+      return "wezterm";
+    case "ghostty":
+      return "ghostty";
+    case "alacritty":
+      return "alacritty";
+    case "kitty":
+      return "kitty";
+  }
+}
 
 export function SettingsPage() {
   const settingsOpen = useUiStore((state) => state.settingsOpen);
@@ -43,9 +69,15 @@ export function SettingsPage() {
   const loadAlertSettings = useAlertSettingsStore((state) => state.load);
   const saveAlertSettings = useAlertSettingsStore((state) => state.save);
   const requestAlertPermission = useAlertSettingsStore((state) => state.requestPermission);
+  const terminalSettings = useTerminalSettingsStore((state) => state.settings);
+  const terminalSettingsError = useTerminalSettingsStore((state) => state.error);
+  const isSavingTerminalSettings = useTerminalSettingsStore((state) => state.isSaving);
+  const loadTerminalSettings = useTerminalSettingsStore((state) => state.load);
+  const saveTerminalSettings = useTerminalSettingsStore((state) => state.save);
   const [section, setSection] = useState<SettingsSection>("appearance");
   const [trayDraft, setTrayDraft] = useState<TraySettings>({ items: [] });
   const [alertDraft, setAlertDraft] = useState<AlertSettings>({ rules: [] });
+  const [terminalDraft, setTerminalDraft] = useState<TerminalSettings>({ app: "terminal_app" });
   const { t } = useI18n();
   const trayItemsByHost = useMemo(
     () => new Map(trayDraft.items.map((item) => [item.hostId, item])),
@@ -60,8 +92,9 @@ export function SettingsPage() {
     if (settingsOpen) {
       void loadTraySettings();
       void loadAlertSettings();
+      void loadTerminalSettings();
     }
-  }, [loadAlertSettings, loadTraySettings, settingsOpen]);
+  }, [loadAlertSettings, loadTerminalSettings, loadTraySettings, settingsOpen]);
 
   useEffect(() => {
     setTrayDraft(traySettings);
@@ -70,6 +103,10 @@ export function SettingsPage() {
   useEffect(() => {
     setAlertDraft(alertSettings);
   }, [alertSettings]);
+
+  useEffect(() => {
+    setTerminalDraft(terminalSettings);
+  }, [terminalSettings]);
 
   if (!settingsOpen) {
     return null;
@@ -139,6 +176,14 @@ export function SettingsPage() {
     });
   };
 
+  const setTerminalApp = (app: TerminalApp) => {
+    setTerminalDraft({ app });
+  };
+
+  const onSaveTerminalSettings = async () => {
+    await saveTerminalSettings(terminalDraft);
+  };
+
   return (
     <div className="fixed inset-0 z-30 grid place-items-center bg-[var(--color-overlay)] p-4 backdrop-blur-sm">
       <section className="grid h-[min(620px,calc(100vh-2rem))] w-full max-w-3xl grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-[var(--radius-panel)] border border-[var(--color-border-strong)] bg-[var(--color-panel-glass)] shadow-[var(--shadow-panel)] backdrop-blur">
@@ -169,7 +214,7 @@ export function SettingsPage() {
         </div>
         <div className="grid min-h-0 border-t border-[var(--color-border)] md:grid-cols-[180px_minmax(0,1fr)]">
           <nav className="flex gap-1 border-b border-[var(--color-border)] bg-[var(--color-panel-muted)] p-2 md:flex-col md:items-stretch md:border-b-0 md:border-r">
-            {(["appearance", "menuBar", "alerts"] as const).map((candidate) => (
+            {(["appearance", "menuBar", "alerts", "terminal"] as const).map((candidate) => (
               <button
                 key={candidate}
                 type="button"
@@ -177,7 +222,13 @@ export function SettingsPage() {
                 className="h-9 shrink-0 rounded-[var(--radius-control)] border border-transparent px-3 text-left font-mono text-xs text-[var(--color-text-muted)] hover:bg-[var(--color-row-hover)] data-[active=true]:border-[var(--color-border-subtle)] data-[active=true]:bg-[var(--color-input)] data-[active=true]:text-[var(--color-text)]"
                 data-active={candidate === section}
               >
-                {candidate === "appearance" ? t("appearance") : candidate === "menuBar" ? t("menuBar") : t("alerts")}
+                {candidate === "appearance"
+                  ? t("appearance")
+                  : candidate === "menuBar"
+                    ? t("menuBar")
+                    : candidate === "alerts"
+                      ? t("alerts")
+                      : t("terminal")}
               </button>
             ))}
           </nav>
@@ -298,7 +349,7 @@ export function SettingsPage() {
                   </button>
                 </div>
               </div>
-            ) : (
+            ) : section === "alerts" ? (
               <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-3 font-mono text-xs">
                 <div className="grid gap-2 rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
                   <div className="min-w-0">
@@ -394,6 +445,42 @@ export function SettingsPage() {
                   </div>
                   <button type="button" onClick={onSaveAlertSettings} className="control-button" disabled={isSavingAlertSettings}>
                     {isSavingAlertSettings ? t("saving") : t("save")}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-3 font-mono text-xs">
+                <div className="text-[var(--color-text-muted)]">{t("terminalSettingsHint")}</div>
+
+                <div className="grid content-start gap-2">
+                  <SettingsGroup title={t("terminalApp")}>
+                    <div className="grid w-full max-w-md grid-cols-2 gap-1 rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] p-1 sm:grid-cols-3">
+                      {terminalAppOptions.map((app) => (
+                        <button
+                          key={app}
+                          type="button"
+                          onClick={() => setTerminalApp(app)}
+                          className="h-8 flex-1 rounded-[var(--radius-control)] px-3 font-mono text-xs text-[var(--color-text-muted)] hover:bg-[var(--color-row-hover)] data-[active=true]:bg-[var(--color-panel-muted)] data-[active=true]:text-[var(--color-text)]"
+                          data-active={terminalDraft.app === app}
+                        >
+                          {t(terminalAppLabel(app))}
+                        </button>
+                      ))}
+                    </div>
+                  </SettingsGroup>
+                </div>
+
+                <div className="flex items-center justify-between gap-3 border-t border-[var(--color-border)] pt-3">
+                  <div className="min-w-0 truncate text-[var(--color-danger)]">
+                    {terminalSettingsError ? terminalSettingsError.message : ""}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={onSaveTerminalSettings}
+                    className="control-button"
+                    disabled={isSavingTerminalSettings}
+                  >
+                    {isSavingTerminalSettings ? t("saving") : t("save")}
                   </button>
                 </div>
               </div>

@@ -82,6 +82,21 @@ export type HostConnectionState = {
   lastError?: AppError;
 };
 
+export type TerminalApp = "terminal_app" | "iterm2" | "wezterm" | "ghostty" | "alacritty" | "kitty";
+
+export type TerminalSettings = {
+  app: TerminalApp;
+};
+
+export type HostOpenTerminalPayload = {
+  hostId: HostId;
+};
+
+export type HostOpenTerminalResult = {
+  ok: true;
+  app: TerminalApp;
+};
+
 export type ProcessInfo = {
   pid: number;
   ppid?: number;
@@ -284,6 +299,35 @@ type HostDeleteResult = {
 };
 ```
 
+### `host_open_terminal`
+
+用途：为已保存 host 打开一个本机 macOS 终端，并在终端中启动受控 SSH 会话。前端只传 `hostId`；后端从 `HostConfig` 读取用户名、地址、端口和可选 `keyPath` 生成 `ssh` 命令。该命令不读取、不传递、不打印密码、私钥内容、passphrase 或 credential refs，也不允许前端传入任意 shell 字符串。
+
+请求：
+
+```ts
+type HostOpenTerminalPayload = {
+  hostId: HostId;
+};
+```
+
+响应：
+
+```ts
+type HostOpenTerminalResult = {
+  ok: true;
+  app: "terminal_app" | "iterm2" | "wezterm" | "ghostty" | "alacritty" | "kitty";
+};
+```
+
+规则：
+
+- 只支持 `Terminal.app`、`iTerm2`、`WezTerm`、`Ghostty`、`Alacritty` 和 `kitty`。
+- `Terminal.app` 和 `iTerm2` 通过 AppleScript 打开并写入受控 `ssh` 命令；`WezTerm` 直接执行已安装的 `wezterm` binary，并使用 `start --new-tab -- ssh ...` 打开新 tab；其他终端通过 `/usr/bin/open -a <app> --args ...` 传递参数。
+- 密码、私钥口令和 agent 交互由系统 `ssh` 在外部终端中处理。
+- 这是本机受控启动动作，不是远程命令执行能力；不复用指标采集的 SSH mux session。
+- `hostId` 不存在返回 `HOST_NOT_FOUND`，host 用户名或地址为空返回 `CONFIG_INVALID`。
+
 ### `host_test_connection`
 
 用途：测试 SSH 是否可连接，并返回系统基础信息。
@@ -467,6 +511,42 @@ type AlertSettingsUpdatePayload = {
 
 ```ts
 type AlertSettingsUpdateResult = AlertSettings;
+```
+
+### `terminal_settings_get`
+
+用途：读取主机卡片打开外部终端时使用的 macOS 终端偏好。该配置只保存普通偏好，不包含 SSH 凭据或命令模板。
+
+请求：
+
+```ts
+type TerminalSettingsGetPayload = {};
+```
+
+响应：
+
+```ts
+type TerminalSettings = {
+  app: "terminal_app" | "iterm2" | "wezterm" | "ghostty" | "alacritty" | "kitty";
+};
+```
+
+### `terminal_settings_update`
+
+用途：更新打开 SSH 会话时使用的终端应用。第一版只允许固定终端枚举，不支持自定义命令模板。
+
+请求：
+
+```ts
+type TerminalSettingsUpdatePayload = {
+  settings: TerminalSettings;
+};
+```
+
+响应：
+
+```ts
+type TerminalSettingsUpdateResult = TerminalSettings;
 ```
 
 ### `process_list`

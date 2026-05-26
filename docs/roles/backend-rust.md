@@ -439,6 +439,7 @@ impl MetricsCollector {
 ```
 
 自定义 commands 由 Rust 注册，不开放 shell plugin 给前端。
+打开外部终端 SSH 会话也必须保持为受控本机启动动作：前端只传 `hostId`，后端从已保存 `HostConfig` 生成固定 `ssh` 命令并调用 macOS 终端，不接受前端传入 shell 字符串。
 
 验收：
 

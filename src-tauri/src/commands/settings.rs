@@ -1,6 +1,6 @@
 use crate::{
     app_state::AppState,
-    config::{AlertSettings, TraySettings},
+    config::{AlertSettings, TerminalSettings, TraySettings},
     errors::AppError,
 };
 use tauri::State;
@@ -36,4 +36,17 @@ pub fn alert_settings_update(
     settings: AlertSettings,
 ) -> Result<AlertSettings, AppError> {
     state.config_store.update_alert_settings(settings)
+}
+
+#[tauri::command]
+pub fn terminal_settings_get(state: State<'_, AppState>) -> Result<TerminalSettings, AppError> {
+    state.config_store.get_terminal_settings()
+}
+
+#[tauri::command]
+pub fn terminal_settings_update(
+    state: State<'_, AppState>,
+    settings: TerminalSettings,
+) -> Result<TerminalSettings, AppError> {
+    state.config_store.update_terminal_settings(settings)
 }

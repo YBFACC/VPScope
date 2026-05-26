@@ -14,6 +14,7 @@ import type {
   HostConnectionState,
   HostCreatePayload,
   HostId,
+  HostOpenTerminalResult,
   HostSnapshot,
   HostTestConnectionPayload,
   HostTestConnectionResult,
@@ -23,6 +24,7 @@ import type {
   ProcessInfo,
   ProcessListPayload,
   SshConfigHost,
+  TerminalSettings,
   TraySettings,
 } from "@/types/contracts";
 
@@ -41,6 +43,7 @@ export type VPScopeClient = {
   createHost(payload: HostCreatePayload): Promise<HostConfig>;
   updateHost(payload: HostUpdatePayload): Promise<HostConfig>;
   deleteHost(id: HostId): Promise<void>;
+  openTerminal(hostId: HostId): Promise<HostOpenTerminalResult>;
   testConnection(payload: HostTestConnectionPayload): Promise<HostTestConnectionResult>;
   getLastSnapshot(hostId: HostId): Promise<HostSnapshot | null>;
   subscribeMetrics(payload: MetricsSubscribePayload, onSnapshot: MetricsSnapshotHandler): Promise<() => Promise<void>>;
@@ -51,6 +54,8 @@ export type VPScopeClient = {
   updateTraySettings(settings: TraySettings): Promise<TraySettings>;
   getAlertSettings(): Promise<AlertSettings>;
   updateAlertSettings(settings: AlertSettings): Promise<AlertSettings>;
+  getTerminalSettings(): Promise<TerminalSettings>;
+  updateTerminalSettings(settings: TerminalSettings): Promise<TerminalSettings>;
   getNotificationPermission(): Promise<NativeNotificationPermission>;
   requestNotificationPermission(): Promise<NativeNotificationPermission>;
   sendNativeNotification(payload: NotificationPayload): Promise<void>;
@@ -87,6 +92,9 @@ function createTauriClient(): VPScopeClient {
     },
     async deleteHost(id) {
       await invoke<{ ok: true }>("host_delete", { payload: { id } });
+    },
+    async openTerminal(hostId) {
+      return invoke<HostOpenTerminalResult>("host_open_terminal", { payload: { hostId } });
     },
     async testConnection(payload) {
       return invoke<HostTestConnectionResult>("host_test_connection", payload);
@@ -131,6 +139,12 @@ function createTauriClient(): VPScopeClient {
     },
     async updateAlertSettings(settings) {
       return invoke<AlertSettings>("alert_settings_update", { settings });
+    },
+    async getTerminalSettings() {
+      return invoke<TerminalSettings>("terminal_settings_get", {});
+    },
+    async updateTerminalSettings(settings) {
+      return invoke<TerminalSettings>("terminal_settings_update", { settings });
     },
     async getNotificationPermission() {
       if (typeof window === "undefined" || !("Notification" in window)) {

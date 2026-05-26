@@ -1,6 +1,7 @@
 use super::{
     alert_settings::{AlertMetric, AlertRule, AlertSettings},
     host_config::{HostAuth, HostConfig, HostCreatePayload, HostPatch},
+    terminal_settings::TerminalSettings,
     tray_settings::{TraySettings, TraySettingsItem},
 };
 use crate::errors::AppError;
@@ -17,9 +18,11 @@ pub struct ConfigStore {
     hosts_path: PathBuf,
     tray_settings_path: PathBuf,
     alert_settings_path: PathBuf,
+    terminal_settings_path: PathBuf,
     hosts: RwLock<Vec<HostConfig>>,
     tray_settings: RwLock<TraySettings>,
     alert_settings: RwLock<AlertSettings>,
+    terminal_settings: RwLock<TerminalSettings>,
 }
 
 impl ConfigStore {
@@ -28,6 +31,7 @@ impl ConfigStore {
         let hosts_path = config_dir.join("hosts.json");
         let tray_settings_path = config_dir.join("tray-settings.json");
         let alert_settings_path = config_dir.join("alert-settings.json");
+        let terminal_settings_path = config_dir.join("terminal-settings.json");
         let hosts = if hosts_path.exists() {
             let content = fs::read_to_string(&hosts_path)?;
             if content.trim().is_empty() {
@@ -45,15 +49,21 @@ impl ConfigStore {
             read_json_or_default(&tray_settings_path, "Saved tray settings are invalid")?;
         let alert_settings =
             read_json_or_default(&alert_settings_path, "Saved alert settings are invalid")?;
+        let terminal_settings = read_json_or_default(
+            &terminal_settings_path,
+            "Saved terminal settings are invalid",
+        )?;
         validate_alert_settings(&alert_settings, &hosts)?;
 
         Ok(Self {
             hosts_path,
             tray_settings_path,
             alert_settings_path,
+            terminal_settings_path,
             hosts: RwLock::new(hosts),
             tray_settings: RwLock::new(tray_settings),
             alert_settings: RwLock::new(alert_settings),
+            terminal_settings: RwLock::new(terminal_settings),
         })
     }
 
@@ -245,6 +255,27 @@ impl ConfigStore {
         Ok(settings)
     }
 
+    pub fn get_terminal_settings(&self) -> Result<TerminalSettings, AppError> {
+        Ok(self
+            .terminal_settings
+            .read()
+            .map_err(|_| AppError::internal("Terminal settings lock is poisoned"))?
+            .clone())
+    }
+
+    pub fn update_terminal_settings(
+        &self,
+        settings: TerminalSettings,
+    ) -> Result<TerminalSettings, AppError> {
+        let mut terminal_settings = self
+            .terminal_settings
+            .write()
+            .map_err(|_| AppError::internal("Terminal settings lock is poisoned"))?;
+        *terminal_settings = settings.clone();
+        self.save_terminal_settings_locked(&terminal_settings)?;
+        Ok(settings)
+    }
+
     fn save_locked(&self, hosts: &[HostConfig]) -> Result<(), AppError> {
         let parent = self.hosts_path.parent().unwrap_or_else(|| Path::new("."));
         fs::create_dir_all(parent)?;
@@ -271,6 +302,14 @@ impl ConfigStore {
             &self.alert_settings_path,
             settings,
             "Failed to serialize alert settings",
+        )
+    }
+
+    fn save_terminal_settings_locked(&self, settings: &TerminalSettings) -> Result<(), AppError> {
+        write_json_atomic(
+            &self.terminal_settings_path,
+            settings,
+            "Failed to serialize terminal settings",
         )
     }
 }
@@ -442,7 +481,7 @@ fn validate_host_fields(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::{AlertMetric, HostAuth, HostCreatePayload};
+    use crate::config::{AlertMetric, HostAuth, HostCreatePayload, TerminalApp, TerminalSettings};
     use std::env;
 
     fn temp_config_dir(name: &str) -> PathBuf {
@@ -564,5 +603,35 @@ mod tests {
 
         let settings = store.get_alert_settings().expect("alert settings");
         assert!(settings.rules.is_empty());
+    }
+
+    #[test]
+    fn terminal_settings_default_to_terminal_app() {
+        let store = create_store("terminal-default");
+
+        let settings = store
+            .get_terminal_settings()
+            .expect("read terminal settings");
+
+        assert_eq!(settings.app, TerminalApp::TerminalApp);
+    }
+
+    #[test]
+    fn terminal_settings_round_trip_to_disk() {
+        let config_dir = temp_config_dir("terminal-round-trip");
+        let store = ConfigStore::new(config_dir.clone()).expect("store");
+
+        store
+            .update_terminal_settings(TerminalSettings {
+                app: TerminalApp::Iterm2,
+            })
+            .expect("save terminal settings");
+
+        let reloaded = ConfigStore::new(config_dir)
+            .expect("reload store")
+            .get_terminal_settings()
+            .expect("read terminal settings");
+
+        assert_eq!(reloaded.app, TerminalApp::Iterm2);
     }
 }

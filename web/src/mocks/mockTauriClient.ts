@@ -7,6 +7,7 @@ import type {
   HostCreatePayload,
   HostId,
   ProcessListPayload,
+  TerminalSettings,
   TraySettings,
 } from "@/types/contracts";
 
@@ -22,6 +23,9 @@ let traySettings: TraySettings = {
 };
 let alertSettings: AlertSettings = {
   rules: [],
+};
+let terminalSettings: TerminalSettings = {
+  app: "terminal_app",
 };
 
 function wait(ms = 180) {
@@ -150,6 +154,24 @@ export function createMockTauriClient(): VPScopeClient {
         rules: alertSettings.rules.filter((rule) => rule.hostId !== id),
       };
     },
+    async openTerminal(hostId: HostId) {
+      await wait(120);
+      const host = hosts.find((candidate) => candidate.id === hostId);
+
+      if (!host) {
+        throw {
+          code: "HOST_NOT_FOUND",
+          message: "Host was not found",
+          retryable: false,
+        };
+      }
+
+      console.info("[mock terminal]", terminalSettings.app, `${host.auth.username}@${host.address}:${host.port}`);
+      return {
+        ok: true,
+        app: terminalSettings.app,
+      };
+    },
     async testConnection(payload) {
       await wait(520);
       const host =
@@ -234,6 +256,15 @@ export function createMockTauriClient(): VPScopeClient {
       return {
         rules: alertSettings.rules.map((rule) => ({ ...rule })),
       };
+    },
+    async getTerminalSettings() {
+      await wait(80);
+      return { ...terminalSettings };
+    },
+    async updateTerminalSettings(settings) {
+      await wait(140);
+      terminalSettings = { ...settings };
+      return { ...terminalSettings };
     },
     async getNotificationPermission() {
       return "granted";

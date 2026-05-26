@@ -6,6 +6,7 @@ import { useI18n } from "@/i18n/useI18n";
 import { formatDateTime, formatDuration } from "@/lib/format";
 import { useHostStore } from "@/stores/hostStore";
 import { useMetricsStore } from "@/stores/metricsStore";
+import { useTerminalSettingsStore } from "@/stores/terminalSettingsStore";
 import type { HostConfig, HostConnectionState, HostSnapshot } from "@/types/contracts";
 
 type HostDetailsTooltipProps = {
@@ -68,7 +69,7 @@ function HostDetailsTooltip({ host, snapshot, connection }: HostDetailsTooltipPr
 
   return (
     <div
-      className="relative ml-1 mt-0.5 shrink-0"
+      className="relative shrink-0"
       onBlur={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget)) {
           setIsOpen(false);
@@ -134,6 +135,9 @@ export function HostSidebar() {
   const deleteHost = useHostStore((state) => state.deleteHost);
   const connectionStates = useHostStore((state) => state.connectionStates);
   const snapshots = useMetricsStore((state) => state.snapshots);
+  const openHostTerminal = useTerminalSettingsStore((state) => state.openHostTerminal);
+  const openingHostIds = useTerminalSettingsStore((state) => state.openingHostIds);
+  const terminalErrorsByHost = useTerminalSettingsStore((state) => state.errorsByHost);
   const { t } = useI18n();
   const [formOpen, setFormOpen] = useState(false);
 
@@ -151,10 +155,10 @@ export function HostSidebar() {
         {hosts.map((host) => (
           <div
             key={host.id}
-            className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_auto] rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] p-2 transition-colors hover:border-[var(--color-border)] hover:bg-[var(--color-row-hover)] data-[active=true]:border-[var(--color-border-strong)] data-[active=true]:bg-[var(--color-panel-muted)] data-[active=true]:shadow-[var(--shadow-glow)]"
+            className="relative min-w-0 rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] p-2 transition-colors hover:border-[var(--color-border)] hover:bg-[var(--color-row-hover)] data-[active=true]:border-[var(--color-border-strong)] data-[active=true]:bg-[var(--color-panel-muted)] data-[active=true]:shadow-[var(--shadow-glow)]"
             data-active={host.id === selectedHostId}
           >
-            <button type="button" onClick={() => selectHost(host.id)} className="min-w-0 text-left">
+            <button type="button" onClick={() => selectHost(host.id)} className="block min-w-0 pr-7 text-left">
               <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
                 <span className="min-w-0 truncate font-mono text-sm text-[var(--color-text)]">{host.name}</span>
                 <HostConnectionBadge state={connectionStates[host.id]} />
@@ -162,19 +166,41 @@ export function HostSidebar() {
               <div className="mt-1 truncate font-mono text-[11px] text-[var(--color-text-muted)]">
                 {host.auth.username}@{host.address}:{host.port}
               </div>
-              <div className="mt-2 flex min-w-0 flex-wrap gap-1 overflow-hidden">
+            </button>
+            <div className="mt-2 flex min-w-0 items-center justify-between gap-2">
+              <div className="flex min-w-0 flex-wrap gap-1 overflow-hidden">
                 {host.tags.map((tag) => (
                   <span key={tag} className="rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-panel-muted)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--color-text-muted)]">
                     {tag}
                   </span>
                 ))}
               </div>
-            </button>
-            <HostDetailsTooltip host={host} snapshot={snapshots[host.id]} connection={connectionStates[host.id]} />
+              <div className="flex shrink-0 items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    void openHostTerminal(host.id);
+                  }}
+                  disabled={Boolean(openingHostIds[host.id])}
+                  className="grid h-6 w-6 place-items-center rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] font-mono text-[11px] font-semibold text-[var(--color-text-muted)] shadow-[var(--shadow-panel)] hover:border-[var(--color-border-strong)] hover:bg-[var(--color-panel-muted)] hover:text-[var(--color-text)] disabled:cursor-wait disabled:opacity-60"
+                  title={openingHostIds[host.id] ? t("openingTerminal") : t("openTerminal")}
+                  aria-label={openingHostIds[host.id] ? t("openingTerminal") : t("openTerminal")}
+                >
+                  {openingHostIds[host.id] ? "..." : ">"}
+                </button>
+                <HostDetailsTooltip host={host} snapshot={snapshots[host.id]} connection={connectionStates[host.id]} />
+              </div>
+            </div>
+            {terminalErrorsByHost[host.id] ? (
+              <div className="mt-1 truncate font-mono text-[10px] text-[var(--color-danger)]">
+                {t("openTerminalFailed")}: {terminalErrorsByHost[host.id]?.message}
+              </div>
+            ) : null}
             <button
               type="button"
               onClick={() => void deleteHost(host.id)}
-              className="ml-1 h-6 w-6 shrink-0 rounded-[var(--radius-control)] font-mono text-xs text-[var(--color-text-muted)] hover:bg-[var(--color-panel-muted)] hover:text-[var(--color-danger)]"
+              className="absolute right-2 top-2 h-6 w-6 shrink-0 rounded-[var(--radius-control)] font-mono text-xs text-[var(--color-text-muted)] hover:bg-[var(--color-panel-muted)] hover:text-[var(--color-danger)]"
               title={t("delete")}
               aria-label={t("delete")}
             >
