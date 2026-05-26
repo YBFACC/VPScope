@@ -162,6 +162,86 @@ button:disabled {
   outline-offset: 2px;
 }
 
+.host-icon-button {
+  display: grid;
+  height: 1.5rem;
+  width: 1.5rem;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-border-subtle);
+  background: color-mix(in srgb, var(--color-input) 82%, var(--color-panel-muted));
+  color: var(--color-text-muted);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease,
+    opacity 120ms ease;
+}
+
+.host-icon-button > svg {
+  width: 0.95rem;
+  height: 0.95rem;
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.host-icon-button:hover:not(:disabled) {
+  border-color: var(--color-border-strong);
+  background: var(--color-panel-muted);
+  color: var(--color-text);
+}
+
+.host-icon-button:focus-visible {
+  outline: 2px solid var(--color-border-strong);
+  outline-offset: 2px;
+}
+
+.host-icon-button:disabled {
+  cursor: not-allowed;
+  color: color-mix(in srgb, var(--color-text-muted) 56%, transparent);
+  opacity: 0.42;
+}
+
+.host-icon-button-danger:hover:not(:disabled) {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+.host-segmented-control {
+  display: flex;
+  height: 1.5rem;
+  overflow: hidden;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-border-subtle);
+  background: color-mix(in srgb, var(--color-input) 82%, var(--color-panel-muted));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+
+.host-icon-button-segment {
+  width: 1.4rem;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.host-icon-button-segment + .host-icon-button-segment {
+  border-left: 1px solid var(--color-border-subtle);
+}
+
+.host-icon-loading {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 999px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+}
+
 .dashboard-grid {
   display: grid;
   min-height: 0;

@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from "react";
+import { useId, useRef, useState, type SVGProps } from "react";
 import { createPortal } from "react-dom";
 import { HostConnectionBadge } from "@/features/hosts/HostConnectionBadge";
 import { HostForm } from "@/features/hosts/HostForm";
@@ -14,6 +14,46 @@ type HostDetailsTooltipProps = {
   snapshot?: HostSnapshot;
   connection?: HostConnectionState;
 };
+
+function ChevronUpIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true" {...props}>
+      <path d="M4.25 9.75 8 6l3.75 3.75" />
+    </svg>
+  );
+}
+
+function ChevronDownIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true" {...props}>
+      <path d="M4.25 6.25 8 10l3.75-3.75" />
+    </svg>
+  );
+}
+
+function XIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true" {...props}>
+      <path d="m4.75 4.75 6.5 6.5M11.25 4.75l-6.5 6.5" />
+    </svg>
+  );
+}
+
+function TerminalIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true" {...props}>
+      <path d="m5 4.75 3.25 3.25L5 11.25M9 11.25h2.5" />
+    </svg>
+  );
+}
+
+function InfoIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true" {...props}>
+      <path d="M8 7.25v4M8 4.75h.01" />
+    </svg>
+  );
+}
 
 function HostDetailsTooltip({ host, snapshot, connection }: HostDetailsTooltipProps) {
   const { t } = useI18n();
@@ -84,13 +124,14 @@ function HostDetailsTooltip({ host, snapshot, connection }: HostDetailsTooltipPr
         type="button"
         aria-describedby={isOpen ? tooltipId : undefined}
         aria-label={t("details")}
-        className="grid h-6 w-6 place-items-center rounded-full border border-[var(--color-border-subtle)] bg-[var(--color-input)] font-mono text-[11px] font-semibold text-[var(--color-text-muted)] shadow-[var(--shadow-panel)] transition-colors hover:border-[var(--color-border-strong)] hover:bg-[var(--color-panel-muted)] hover:text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/40"
+        title={t("details")}
+        className="host-icon-button rounded-full"
         onClick={(event) => {
           event.stopPropagation();
           showTooltip();
         }}
       >
-        i
+        <InfoIcon />
       </button>
       {isOpen ? createPortal(
         <div
@@ -133,6 +174,8 @@ export function HostSidebar() {
   const selectedHostId = useHostStore((state) => state.selectedHostId);
   const selectHost = useHostStore((state) => state.selectHost);
   const deleteHost = useHostStore((state) => state.deleteHost);
+  const moveHost = useHostStore((state) => state.moveHost);
+  const isReordering = useHostStore((state) => state.isReordering);
   const connectionStates = useHostStore((state) => state.connectionStates);
   const snapshots = useMetricsStore((state) => state.snapshots);
   const openHostTerminal = useTerminalSettingsStore((state) => state.openHostTerminal);
@@ -152,30 +195,82 @@ export function HostSidebar() {
       </div>
 
       <div className="scrollbar-none min-h-0 min-w-0 space-y-1.5 overflow-auto">
-        {hosts.map((host) => (
+        {hosts.map((host, index) => (
           <div
             key={host.id}
-            className="relative min-w-0 rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] p-2 transition-colors hover:border-[var(--color-border)] hover:bg-[var(--color-row-hover)] data-[active=true]:border-[var(--color-border-strong)] data-[active=true]:bg-[var(--color-panel-muted)] data-[active=true]:shadow-[var(--shadow-glow)]"
+            onClick={() => selectHost(host.id)}
+            className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-3 rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] p-2 transition-colors hover:border-[var(--color-border)] hover:bg-[var(--color-row-hover)] data-[active=true]:border-[var(--color-border-strong)] data-[active=true]:bg-[var(--color-panel-muted)] data-[active=true]:shadow-[var(--shadow-glow)]"
             data-active={host.id === selectedHostId}
           >
-            <button type="button" onClick={() => selectHost(host.id)} className="block min-w-0 pr-7 text-left">
-              <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-                <span className="min-w-0 truncate font-mono text-sm text-[var(--color-text)]">{host.name}</span>
-                <HostConnectionBadge state={connectionStates[host.id]} />
-              </div>
-              <div className="mt-1 truncate font-mono text-[11px] text-[var(--color-text-muted)]">
-                {host.auth.username}@{host.address}:{host.port}
-              </div>
-            </button>
-            <div className="mt-2 flex min-w-0 items-center justify-between gap-2">
-              <div className="flex min-w-0 flex-wrap gap-1 overflow-hidden">
+            <div className="min-w-0">
+              <button type="button" onClick={() => selectHost(host.id)} className="block min-w-0 text-left">
+                <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+                  <span className="min-w-0 truncate font-mono text-sm text-[var(--color-text)]">{host.name}</span>
+                  <HostConnectionBadge state={connectionStates[host.id]} />
+                </div>
+                <div className="mt-1 truncate font-mono text-[11px] text-[var(--color-text-muted)]">
+                  {host.auth.username}@{host.address}:{host.port}
+                </div>
+              </button>
+              <div className="mt-2 flex min-w-0 flex-wrap gap-1 overflow-hidden">
                 {host.tags.map((tag) => (
                   <span key={tag} className="rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-panel-muted)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--color-text-muted)]">
                     {tag}
                   </span>
                 ))}
               </div>
-              <div className="flex shrink-0 items-center gap-1.5">
+              {terminalErrorsByHost[host.id] ? (
+                <div className="mt-1 truncate font-mono text-[10px] text-[var(--color-danger)]">
+                  {t("openTerminalFailed")}: {terminalErrorsByHost[host.id]?.message}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="flex w-[5.75rem] shrink-0 flex-col items-end justify-between gap-3 self-stretch">
+              <div className="flex items-center justify-end gap-1">
+                <div className="host-segmented-control">
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void moveHost(host.id, "up");
+                    }}
+                    disabled={index === 0 || isReordering}
+                    className="host-icon-button host-icon-button-segment rounded-l-[var(--radius-control)]"
+                    title={t("moveHostUp")}
+                    aria-label={t("moveHostUp")}
+                  >
+                    <ChevronUpIcon />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void moveHost(host.id, "down");
+                    }}
+                    disabled={index === hosts.length - 1 || isReordering}
+                    className="host-icon-button host-icon-button-segment rounded-r-[var(--radius-control)]"
+                    title={t("moveHostDown")}
+                    aria-label={t("moveHostDown")}
+                  >
+                    <ChevronDownIcon />
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    void deleteHost(host.id);
+                  }}
+                  className="host-icon-button host-icon-button-danger"
+                  title={t("delete")}
+                  aria-label={t("delete")}
+                >
+                  <XIcon />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-end gap-1.5">
                 <button
                   type="button"
                   onClick={(event) => {
@@ -183,29 +278,15 @@ export function HostSidebar() {
                     void openHostTerminal(host.id);
                   }}
                   disabled={Boolean(openingHostIds[host.id])}
-                  className="grid h-6 w-6 place-items-center rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] font-mono text-[11px] font-semibold text-[var(--color-text-muted)] shadow-[var(--shadow-panel)] hover:border-[var(--color-border-strong)] hover:bg-[var(--color-panel-muted)] hover:text-[var(--color-text)] disabled:cursor-wait disabled:opacity-60"
+                  className="host-icon-button"
                   title={openingHostIds[host.id] ? t("openingTerminal") : t("openTerminal")}
                   aria-label={openingHostIds[host.id] ? t("openingTerminal") : t("openTerminal")}
                 >
-                  {openingHostIds[host.id] ? "..." : ">"}
+                  {openingHostIds[host.id] ? <span className="host-icon-loading" /> : <TerminalIcon />}
                 </button>
                 <HostDetailsTooltip host={host} snapshot={snapshots[host.id]} connection={connectionStates[host.id]} />
               </div>
             </div>
-            {terminalErrorsByHost[host.id] ? (
-              <div className="mt-1 truncate font-mono text-[10px] text-[var(--color-danger)]">
-                {t("openTerminalFailed")}: {terminalErrorsByHost[host.id]?.message}
-              </div>
-            ) : null}
-            <button
-              type="button"
-              onClick={() => void deleteHost(host.id)}
-              className="absolute right-2 top-2 h-6 w-6 shrink-0 rounded-[var(--radius-control)] font-mono text-xs text-[var(--color-text-muted)] hover:bg-[var(--color-panel-muted)] hover:text-[var(--color-danger)]"
-              title={t("delete")}
-              aria-label={t("delete")}
-            >
-              x
-            </button>
           </div>
         ))}
       </div>

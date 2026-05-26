@@ -4,7 +4,7 @@ pub mod processes;
 pub mod settings;
 
 pub use hosts::{
-    host_create, host_delete, host_list, host_open_terminal, host_ssh_config_list,
+    host_create, host_delete, host_list, host_open_terminal, host_reorder, host_ssh_config_list,
     host_test_connection, host_update,
 };
 pub use metrics::{metrics_last_snapshot, metrics_subscribe, metrics_unsubscribe};

@@ -173,6 +173,21 @@ impl ConfigStore {
         Ok(updated)
     }
 
+    pub fn reorder_hosts(
+        &self,
+        ordered_host_ids: Vec<String>,
+    ) -> Result<Vec<HostConfig>, AppError> {
+        let mut hosts = self
+            .hosts
+            .write()
+            .map_err(|_| AppError::internal("Host config lock is poisoned"))?;
+        let reordered = reorder_hosts_by_ids(&hosts, &ordered_host_ids)?;
+
+        *hosts = reordered;
+        self.save_locked(&hosts)?;
+        Ok(hosts.clone())
+    }
+
     pub fn delete_host(&self, id: &str) -> Result<(), AppError> {
         let mut hosts = self
             .hosts
@@ -359,6 +374,39 @@ fn auth_username(auth: &HostAuth) -> &str {
     }
 }
 
+fn reorder_hosts_by_ids(
+    hosts: &[HostConfig],
+    ordered_host_ids: &[String],
+) -> Result<Vec<HostConfig>, AppError> {
+    if ordered_host_ids.len() != hosts.len() {
+        return Err(AppError::config_invalid(
+            "Host reorder payload must include every saved host exactly once",
+        ));
+    }
+
+    let mut reordered = Vec::with_capacity(hosts.len());
+
+    for host_id in ordered_host_ids {
+        if reordered
+            .iter()
+            .any(|host: &HostConfig| host.id == *host_id)
+        {
+            return Err(AppError::config_invalid(
+                "Host reorder payload contains a duplicate host id",
+            ));
+        }
+
+        let host = hosts
+            .iter()
+            .find(|candidate| candidate.id == *host_id)
+            .cloned()
+            .ok_or_else(|| AppError::host_not_found(host_id))?;
+        reordered.push(host);
+    }
+
+    Ok(reordered)
+}
+
 fn validate_tray_settings(settings: &TraySettings, hosts: &[HostConfig]) -> Result<(), AppError> {
     let mut seen = Vec::<&str>::new();
 
@@ -492,11 +540,11 @@ mod tests {
         ConfigStore::new(temp_config_dir(name)).expect("config store")
     }
 
-    fn create_test_host(store: &ConfigStore) -> HostConfig {
+    fn create_named_test_host(store: &ConfigStore, name: &str, address: &str) -> HostConfig {
         store
             .create_host(HostCreatePayload {
-                name: "prod-1".to_string(),
-                address: "203.0.113.10".to_string(),
+                name: name.to_string(),
+                address: address.to_string(),
                 port: 22,
                 auth: HostAuth::SshAgent {
                     username: "ubuntu".to_string(),
@@ -505,6 +553,10 @@ mod tests {
                 tags: Vec::new(),
             })
             .expect("host")
+    }
+
+    fn create_test_host(store: &ConfigStore) -> HostConfig {
+        create_named_test_host(store, "prod-1", "203.0.113.10")
     }
 
     fn cpu_rule(id: &str, host_id: &str) -> AlertRule {
@@ -603,6 +655,72 @@ mod tests {
 
         let settings = store.get_alert_settings().expect("alert settings");
         assert!(settings.rules.is_empty());
+    }
+
+    #[test]
+    fn reorder_hosts_round_trip_to_disk_without_touching_timestamps() {
+        let config_dir = temp_config_dir("host-reorder-round-trip");
+        let store = ConfigStore::new(config_dir.clone()).expect("store");
+        let first = create_named_test_host(&store, "prod-1", "203.0.113.10");
+        let second = create_named_test_host(&store, "prod-2", "203.0.113.11");
+        let third = create_named_test_host(&store, "prod-3", "203.0.113.12");
+
+        let reordered = store
+            .reorder_hosts(vec![third.id.clone(), first.id.clone(), second.id.clone()])
+            .expect("reorder hosts");
+
+        assert_eq!(
+            reordered
+                .iter()
+                .map(|host| host.id.as_str())
+                .collect::<Vec<_>>(),
+            vec![third.id.as_str(), first.id.as_str(), second.id.as_str()]
+        );
+        assert_eq!(reordered[1].updated_at, first.updated_at);
+
+        let reloaded = ConfigStore::new(config_dir)
+            .expect("reload store")
+            .list_hosts()
+            .expect("list hosts");
+
+        assert_eq!(
+            reloaded
+                .iter()
+                .map(|host| host.id.as_str())
+                .collect::<Vec<_>>(),
+            vec![third.id.as_str(), first.id.as_str(), second.id.as_str()]
+        );
+    }
+
+    #[test]
+    fn reorder_hosts_rejects_invalid_id_lists_without_changing_order() {
+        let store = create_store("host-reorder-invalid");
+        let first = create_named_test_host(&store, "prod-1", "203.0.113.10");
+        let second = create_named_test_host(&store, "prod-2", "203.0.113.11");
+        let original_ids = vec![first.id.clone(), second.id.clone()];
+
+        let missing_error = store
+            .reorder_hosts(vec![second.id.clone()])
+            .expect_err("missing host id must fail");
+        assert_eq!(missing_error.code, "CONFIG_INVALID");
+
+        let duplicate_error = store
+            .reorder_hosts(vec![first.id.clone(), first.id.clone()])
+            .expect_err("duplicate host id must fail");
+        assert_eq!(duplicate_error.code, "CONFIG_INVALID");
+
+        let unknown_error = store
+            .reorder_hosts(vec![second.id.clone(), "missing-host".to_string()])
+            .expect_err("unknown host id must fail");
+        assert_eq!(unknown_error.code, "HOST_NOT_FOUND");
+
+        let current_ids = store
+            .list_hosts()
+            .expect("list hosts")
+            .into_iter()
+            .map(|host| host.id)
+            .collect::<Vec<_>>();
+        assert_eq!(current_ids, original_ids);
     }
 
     #[test]

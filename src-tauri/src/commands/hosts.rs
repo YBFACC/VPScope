@@ -2,8 +2,8 @@ use crate::{
     app_state::AppState,
     config::storage::unix_ms,
     config::{
-        HostAuth, HostConfig, HostCreatePayload, HostDeletePayload, HostPatch, HostUpdatePayload,
-        OkResult, TerminalApp,
+        HostAuth, HostConfig, HostCreatePayload, HostDeletePayload, HostPatch, HostReorderPayload,
+        HostUpdatePayload, OkResult, TerminalApp,
     },
     errors::AppError,
 };
@@ -56,6 +56,19 @@ pub fn host_update(
         },
     };
     state.config_store.update_host(&payload.id, payload.patch)
+}
+
+#[tauri::command]
+pub fn host_reorder(
+    payload: Option<HostReorderPayload>,
+    ordered_host_ids: Option<Vec<String>>,
+    state: State<'_, AppState>,
+) -> Result<Vec<HostConfig>, AppError> {
+    let ordered_host_ids = payload
+        .map(|payload| payload.ordered_host_ids)
+        .or(ordered_host_ids)
+        .ok_or_else(|| AppError::config_invalid("Ordered host ids are required"))?;
+    state.config_store.reorder_hosts(ordered_host_ids)
 }
 
 #[tauri::command]

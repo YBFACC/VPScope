@@ -15,6 +15,7 @@ import type {
   HostCreatePayload,
   HostId,
   HostOpenTerminalResult,
+  HostReorderPayload,
   HostSnapshot,
   HostTestConnectionPayload,
   HostTestConnectionResult,
@@ -42,6 +43,7 @@ export type VPScopeClient = {
   listSshConfigHosts(): Promise<SshConfigHost[]>;
   createHost(payload: HostCreatePayload): Promise<HostConfig>;
   updateHost(payload: HostUpdatePayload): Promise<HostConfig>;
+  reorderHosts(payload: HostReorderPayload): Promise<HostConfig[]>;
   deleteHost(id: HostId): Promise<void>;
   openTerminal(hostId: HostId): Promise<HostOpenTerminalResult>;
   testConnection(payload: HostTestConnectionPayload): Promise<HostTestConnectionResult>;
@@ -89,6 +91,9 @@ function createTauriClient(): VPScopeClient {
     },
     async updateHost(payload) {
       return invoke<HostConfig>("host_update", payload);
+    },
+    async reorderHosts(payload) {
+      return invoke<HostConfig[]>("host_reorder", { payload });
     },
     async deleteHost(id) {
       await invoke<{ ok: true }>("host_delete", { payload: { id } });

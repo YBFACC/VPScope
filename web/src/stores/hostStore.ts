@@ -17,10 +17,12 @@ type HostStore = {
   selectedHostId?: HostId;
   connectionStates: Record<HostId, HostConnectionState>;
   isLoading: boolean;
+  isReordering: boolean;
   error?: AppError;
   loadHosts: () => Promise<void>;
   selectHost: (hostId: HostId) => void;
   createHost: (payload: HostCreatePayload) => Promise<HostConfig>;
+  moveHost: (hostId: HostId, direction: "up" | "down") => Promise<void>;
   deleteHost: (hostId: HostId) => Promise<void>;
   testConnection: (payload: HostTestConnectionPayload) => Promise<void>;
   setConnectionState: (state: HostConnectionState) => void;
@@ -37,6 +39,7 @@ export const useHostStore = create<HostStore>((set, get) => ({
   hosts: [],
   connectionStates: {},
   isLoading: false,
+  isReordering: false,
   async loadHosts() {
     set({ isLoading: true, error: undefined });
 
@@ -66,7 +69,7 @@ export const useHostStore = create<HostStore>((set, get) => ({
     const host = await runClient(() => tauriClient.createHost(payload));
 
     set((state) => ({
-      hosts: [host, ...state.hosts],
+      hosts: [...state.hosts, host],
       selectedHostId: host.id,
       connectionStates: {
         ...state.connectionStates,
@@ -75,6 +78,42 @@ export const useHostStore = create<HostStore>((set, get) => ({
     }));
 
     return host;
+  },
+  async moveHost(hostId, direction) {
+    const { hosts } = get();
+    const currentIndex = hosts.findIndex((host) => host.id === hostId);
+    const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+
+    if (currentIndex < 0 || targetIndex < 0 || targetIndex >= hosts.length) {
+      return;
+    }
+
+    const nextHosts = [...hosts];
+    [nextHosts[currentIndex], nextHosts[targetIndex]] = [nextHosts[targetIndex], nextHosts[currentIndex]];
+    const orderedHostIds = nextHosts.map((host) => host.id);
+
+    set({ isReordering: true, error: undefined });
+
+    try {
+      const reorderedHosts = await runClient(() => tauriClient.reorderHosts({ orderedHostIds }));
+      set((state) => {
+        const previous = state.connectionStates;
+        const connectionStates = Object.fromEntries(
+          reorderedHosts.map((host) => [host.id, previous[host.id] ?? defaultState(host.id)]),
+        );
+
+        return {
+          hosts: reorderedHosts,
+          connectionStates,
+          selectedHostId: reorderedHosts.some((host) => host.id === state.selectedHostId)
+            ? state.selectedHostId
+            : reorderedHosts[0]?.id,
+          isReordering: false,
+        };
+      });
+    } catch (error) {
+      set({ error: error as AppError, isReordering: false });
+    }
   },
   async deleteHost(hostId) {
     await runClient(() => tauriClient.deleteHost(hostId));

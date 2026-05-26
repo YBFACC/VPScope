@@ -74,6 +74,12 @@ pub struct HostUpdatePayload {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct HostReorderPayload {
+    pub ordered_host_ids: Vec<HostId>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct HostDeletePayload {
     pub id: HostId,
 }

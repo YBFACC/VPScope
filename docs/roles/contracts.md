@@ -279,6 +279,30 @@ type HostUpdatePayload = {
 type HostUpdateResult = HostConfig;
 ```
 
+### `host_reorder`
+
+用途：调整已保存服务器列表的显示顺序。`host_list` 必须按该保存顺序返回。
+
+请求：
+
+```ts
+type HostReorderPayload = {
+  orderedHostIds: HostId[];
+};
+```
+
+响应：
+
+```ts
+type HostReorderResult = HostConfig[];
+```
+
+规则：
+
+- `orderedHostIds` 必须包含当前所有 host id，且每个 id 只能出现一次。
+- 该命令只调整保存数组顺序，不修改单个 `HostConfig.updatedAt`。
+- 缺失或重复 id 返回 `CONFIG_INVALID`；未知 id 返回 `HOST_NOT_FOUND`。
+
 ### `host_delete`
 
 用途：删除服务器配置，并清理关联凭据。

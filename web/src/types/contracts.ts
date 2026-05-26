@@ -85,6 +85,12 @@ export type HostUpdatePayload = {
 
 export type HostUpdateResult = HostConfig;
 
+export type HostReorderPayload = {
+  orderedHostIds: HostId[];
+};
+
+export type HostReorderResult = HostConfig[];
+
 export type HostDeletePayload = {
   id: HostId;
 };
@@ -259,6 +265,7 @@ export type VpscopeCommandPayloads = {
   host_list: HostListPayload;
   host_create: HostCreatePayload;
   host_update: HostUpdatePayload;
+  host_reorder: HostReorderPayload;
   host_delete: HostDeletePayload;
   host_open_terminal: HostOpenTerminalPayload;
   host_ssh_config_list: Record<string, never>;
@@ -279,6 +286,7 @@ export type VpscopeCommandResults = {
   host_list: HostListResult;
   host_create: HostCreateResult;
   host_update: HostUpdateResult;
+  host_reorder: HostReorderResult;
   host_delete: HostDeleteResult;
   host_open_terminal: HostOpenTerminalResult;
   host_ssh_config_list: SshConfigHost[];

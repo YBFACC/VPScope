@@ -121,7 +121,7 @@ export function createMockTauriClient(): VPScopeClient {
     async createHost(payload) {
       await wait(260);
       const host = createHostConfig(payload);
-      hosts = [host, ...hosts];
+      hosts = [...hosts, host];
       return { ...host };
     },
     async updateHost(payload) {
@@ -146,6 +146,42 @@ export function createMockTauriClient(): VPScopeClient {
 
       hosts = hosts.map((host) => (host.id === payload.id ? updated : host));
       return { ...updated };
+    },
+    async reorderHosts(payload) {
+      await wait(180);
+      if (payload.orderedHostIds.length !== hosts.length) {
+        throw {
+          code: "CONFIG_INVALID",
+          message: "Host reorder payload must include every saved host exactly once",
+          retryable: false,
+        };
+      }
+
+      const reordered: HostConfig[] = [];
+
+      for (const hostId of payload.orderedHostIds) {
+        if (reordered.some((host) => host.id === hostId)) {
+          throw {
+            code: "CONFIG_INVALID",
+            message: "Host reorder payload contains a duplicate host id",
+            retryable: false,
+          };
+        }
+
+        const host = hosts.find((candidate) => candidate.id === hostId);
+        if (!host) {
+          throw {
+            code: "HOST_NOT_FOUND",
+            message: "Host was not found",
+            retryable: false,
+          };
+        }
+
+        reordered.push(host);
+      }
+
+      hosts = reordered;
+      return hosts.map((host) => ({ ...host }));
     },
     async deleteHost(id: HostId) {
       await wait(160);
