@@ -181,7 +181,7 @@ function isTauriRuntime() {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in (window as unknown as Record<string, unknown>);
 }
 
-export const clientMode = import.meta.env.VITE_VPSCOPE_CLIENT === "tauri" || isTauriRuntime() ? "tauri" : "mock";
+const clientMode = import.meta.env.VITE_VPSCOPE_CLIENT === "tauri" || isTauriRuntime() ? "tauri" : "mock";
 
 export const tauriClient: VPScopeClient = clientMode === "tauri" ? createTauriClient() : createMockTauriClient();
 

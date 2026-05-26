@@ -1,6 +1,5 @@
 import { useI18n } from "@/i18n/useI18n";
 import { formatDateTime } from "@/lib/format";
-import { clientMode } from "@/lib/tauriClient";
 import { useHostStore, useSelectedHost } from "@/stores/hostStore";
 import { useMetricsStore } from "@/stores/metricsStore";
 import { useUiStore } from "@/stores/uiStore";
@@ -24,9 +23,6 @@ export function TopToolbar() {
           <h1 className="font-mono text-lg font-semibold leading-none text-[var(--color-text)]">
             <span className="text-[var(--color-accent)]">VP</span>Scope
           </h1>
-          <span className="rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-accent-soft)] px-1.5 py-0.5 font-mono text-[10px] uppercase text-[var(--color-accent)]">
-            {clientMode}
-          </span>
           <span className="rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] px-2 py-0.5 font-mono text-xs text-[var(--color-text-muted)]">
             {displayTs ? formatDateTime(displayTs) : t("never")}
           </span>
