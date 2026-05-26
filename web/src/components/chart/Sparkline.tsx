@@ -33,7 +33,7 @@ export function Sparkline({
   const areaPoints = points ? `0,${height} ${points} ${width},${height}` : "";
 
   return (
-    <svg className="h-full w-full overflow-visible" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
+    <svg className="block h-full w-full overflow-hidden" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
       {showGrid ? (
         <>
           <path d={`M 0 ${height - 1} H ${width}`} stroke="var(--color-chart-grid)" strokeWidth="1" />

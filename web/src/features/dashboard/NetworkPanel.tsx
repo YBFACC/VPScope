@@ -26,7 +26,7 @@ export function NetworkPanel({ snapshot, rxHistory, txHistory }: NetworkPanelPro
     <MetricPanel title={t("network")} accent="var(--color-network-rx)" status={t("ifaces", { count: snapshot.network.length })}>
       <div className="grid h-full min-h-0 grid-rows-[auto_auto_minmax(0,1fr)] gap-3">
         <div className="grid min-h-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2">
-          <div className="grid min-h-0 gap-2 rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] p-2">
+          <div className="grid min-h-0 grid-rows-[auto_48px] gap-2 rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] p-2">
             <div className="flex items-baseline justify-between gap-2 font-mono">
               <span className="text-[11px] uppercase text-[var(--color-text-muted)]">{t("rx")}</span>
               <span className="truncate text-sm text-[var(--color-network-rx)] tabular-nums">{formatRate(rxTotalRate)}</span>
@@ -39,7 +39,7 @@ export function NetworkPanel({ snapshot, rxHistory, txHistory }: NetworkPanelPro
               strokeWidth={2.2}
             />
           </div>
-          <div className="grid min-h-0 gap-2 rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] p-2">
+          <div className="grid min-h-0 grid-rows-[auto_48px] gap-2 rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] p-2">
             <div className="flex items-baseline justify-between gap-2 font-mono">
               <span className="text-[11px] uppercase text-[var(--color-text-muted)]">{t("tx")}</span>
               <span className="truncate text-sm text-[var(--color-network-tx)] tabular-nums">{formatRate(txTotalRate)}</span>
