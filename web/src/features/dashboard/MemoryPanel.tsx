@@ -33,19 +33,19 @@ export function MemoryPanel({ snapshot, history }: MemoryPanelProps) {
             <div className="grid grid-cols-3 gap-2 font-mono text-[11px]">
               <div className="rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] px-2 py-1">
                 <div className="text-[var(--color-text-muted)]">{t("used")}</div>
-                <div className="mt-0.5 truncate text-sm text-[var(--color-memory)] tabular-nums">
+                <div className="mt-0.5 truncate text-xs text-[var(--color-memory)] tabular-nums">
                   {formatBytes(snapshot.memory.usedBytes)}
                 </div>
               </div>
               <div className="rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] px-2 py-1">
                 <div className="text-[var(--color-text-muted)]">{t("available")}</div>
-                <div className="mt-0.5 truncate text-sm text-[var(--color-cpu)] tabular-nums">
+                <div className="mt-0.5 truncate text-xs text-[var(--color-cpu)] tabular-nums">
                   {formatBytes(snapshot.memory.availableBytes)}
                 </div>
               </div>
               <div className="rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] px-2 py-1">
                 <div className="text-[var(--color-text-muted)]">{t("cache")}</div>
-                <div className="mt-0.5 truncate text-sm text-[var(--color-text)] tabular-nums">
+                <div className="mt-0.5 truncate text-xs text-[var(--color-text)] tabular-nums">
                   {formatBytes(snapshot.memory.cachedBytes)}
                 </div>
               </div>

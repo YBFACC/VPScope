@@ -29,7 +29,7 @@ export function NetworkPanel({ snapshot, rxHistory, txHistory }: NetworkPanelPro
           <div className="grid min-h-0 gap-2 rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] p-2">
             <div className="flex items-baseline justify-between gap-2 font-mono">
               <span className="text-[11px] uppercase text-[var(--color-text-muted)]">{t("rx")}</span>
-              <span className="truncate text-lg text-[var(--color-network-rx)] tabular-nums">{formatRate(rxTotalRate)}</span>
+              <span className="truncate text-sm text-[var(--color-network-rx)] tabular-nums">{formatRate(rxTotalRate)}</span>
             </div>
             <Sparkline
               values={rxHistory.map((point) => point.value)}
@@ -42,7 +42,7 @@ export function NetworkPanel({ snapshot, rxHistory, txHistory }: NetworkPanelPro
           <div className="grid min-h-0 gap-2 rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] p-2">
             <div className="flex items-baseline justify-between gap-2 font-mono">
               <span className="text-[11px] uppercase text-[var(--color-text-muted)]">{t("tx")}</span>
-              <span className="truncate text-lg text-[var(--color-network-tx)] tabular-nums">{formatRate(txTotalRate)}</span>
+              <span className="truncate text-sm text-[var(--color-network-tx)] tabular-nums">{formatRate(txTotalRate)}</span>
             </div>
             <Sparkline
               values={txHistory.map((point) => point.value)}

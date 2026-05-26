@@ -29,11 +29,11 @@ export function CpuPanel({ snapshot, history }: CpuPanelProps) {
             <div className="grid grid-cols-2 gap-2 font-mono text-[11px]">
               <div className="rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] px-2 py-1">
                 <div className="text-[var(--color-text-muted)]">{t("average")}</div>
-                <div className="mt-0.5 text-sm text-[var(--color-text)] tabular-nums">{formatPercent(coreAverage)}</div>
+                <div className="mt-0.5 text-xs text-[var(--color-text)] tabular-nums">{formatPercent(coreAverage)}</div>
               </div>
               <div className="rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] px-2 py-1">
                 <div className="text-[var(--color-text-muted)]">{t("peak")}</div>
-                <div className="mt-0.5 text-sm text-[var(--color-cpu)] tabular-nums">{formatPercent(corePeak)}</div>
+                <div className="mt-0.5 text-xs text-[var(--color-cpu)] tabular-nums">{formatPercent(corePeak)}</div>
               </div>
             </div>
             <div className="min-h-0 rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] p-2">
