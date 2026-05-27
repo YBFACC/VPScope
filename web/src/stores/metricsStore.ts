@@ -103,6 +103,11 @@ function sameProcesses(left: ProcessInfo[] | undefined, right: ProcessInfo[]) {
 }
 
 function stableProcesses(previous: ProcessInfo[] | undefined, next: ProcessInfo[]) {
+  // Overview/tray snapshots intentionally omit processes; never let a transient empty active batch blank the table.
+  if (previous && previous.length > 0 && next.length === 0) {
+    return previous;
+  }
+
   return sameProcesses(previous, next) ? previous : next;
 }
 

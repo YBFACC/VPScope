@@ -1,69 +1,81 @@
-import { Sparkline } from "@/components/chart/Sparkline";
-import { SegmentedMeter } from "@/components/meter/SegmentedMeter";
-import { UsageRing } from "@/components/meter/UsageRing";
 import { MetricPanel } from "@/components/panel/MetricPanel";
 import { useI18n } from "@/i18n/useI18n";
 import { formatBytes, formatPercent } from "@/lib/format";
-import type { HistoryPoint } from "@/lib/historyBuffer";
 import type { HostSnapshot } from "@/types/contracts";
 
 type MemoryPanelProps = {
   snapshot: HostSnapshot;
-  history: Array<HistoryPoint<number>>;
+  history?: unknown;
 };
 
-export function MemoryPanel({ snapshot, history }: MemoryPanelProps) {
+type MemoryDotRowProps = {
+  label: string;
+  value: string;
+  percent: number;
+  color: string;
+};
+
+function MemoryDotRow({ label, value, percent, color }: MemoryDotRowProps) {
+  const columns = 34;
+  const rows = 4;
+  const activeColumns = percent > 0 ? Math.max(1, Math.ceil((Math.min(100, percent) / 100) * columns)) : 0;
+
+  return (
+    <div className="btop-memory-stat">
+      <div className="btop-memory-label">
+        <span>{label}:</span>
+        <strong>{value}</strong>
+      </div>
+      <div className="btop-memory-dots">
+        {Array.from({ length: rows * columns }, (_, index) => {
+          const column = index % columns;
+
+          return (
+            <span
+              key={index}
+              className="btop-memory-dot"
+              style={{
+                backgroundColor: column < activeColumns ? color : "var(--color-bar-track)",
+                opacity: column < activeColumns ? 1 : 0.22,
+              }}
+            />
+          );
+        })}
+      </div>
+      <span className="btop-memory-percent">{Math.round(percent)}%</span>
+    </div>
+  );
+}
+
+export function MemoryPanel({ snapshot }: MemoryPanelProps) {
   const { t } = useI18n();
   const usedPercent = snapshot.memory.totalBytes > 0 ? (snapshot.memory.usedBytes / snapshot.memory.totalBytes) * 100 : 0;
+  const availablePercent =
+    snapshot.memory.totalBytes > 0 ? (snapshot.memory.availableBytes / snapshot.memory.totalBytes) * 100 : 0;
+  const cachedPercent = snapshot.memory.totalBytes > 0 ? (snapshot.memory.cachedBytes / snapshot.memory.totalBytes) * 100 : 0;
+  const freeBytes = Math.max(0, snapshot.memory.totalBytes - snapshot.memory.usedBytes);
+  const freePercent = snapshot.memory.totalBytes > 0 ? (freeBytes / snapshot.memory.totalBytes) * 100 : 0;
   const swapPercent =
     snapshot.memory.swapTotalBytes > 0 ? (snapshot.memory.swapUsedBytes / snapshot.memory.swapTotalBytes) * 100 : 0;
 
   return (
-    <MetricPanel panelId="memory" title={t("memory")} accent="var(--color-memory)" status={formatPercent(usedPercent)}>
-      <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-2">
-        <div className="grid min-h-0 grid-cols-[94px_minmax(0,1fr)] gap-2">
-          <UsageRing
-            value={usedPercent}
-            label={t("memory")}
-            detail={formatBytes(snapshot.memory.totalBytes)}
-            color="var(--color-memory)"
-            size={92}
-          />
-          <div className="grid min-h-0 grid-rows-[auto_48px] gap-1.5">
-            <div className="grid grid-cols-3 gap-1.5 font-mono text-[10px]">
-              <div className="pixel-card px-2 py-1">
-                <div className="uppercase text-[var(--color-text-muted)]">{t("used")}</div>
-                <div className="mt-0.5 truncate text-xs text-[var(--color-memory)] tabular-nums">
-                  {formatBytes(snapshot.memory.usedBytes)}
-                </div>
-              </div>
-              <div className="pixel-card px-2 py-1">
-                <div className="uppercase text-[var(--color-text-muted)]">{t("available")}</div>
-                <div className="mt-0.5 truncate text-xs text-[var(--color-cpu)] tabular-nums">
-                  {formatBytes(snapshot.memory.availableBytes)}
-                </div>
-              </div>
-              <div className="pixel-card px-2 py-1">
-                <div className="uppercase text-[var(--color-text-muted)]">{t("cache")}</div>
-                <div className="mt-0.5 truncate text-xs text-[var(--color-text)] tabular-nums">
-                  {formatBytes(snapshot.memory.cachedBytes)}
-                </div>
-              </div>
-            </div>
-            <div className="pixel-card min-h-0 p-1.5">
-              <Sparkline
-                values={history.map((point) => point.value)}
-                color="var(--color-memory)"
-                fillColor="var(--color-chart-fill)"
-                max={100}
-                strokeWidth={2.4}
-              />
-            </div>
+    <MetricPanel panelId="memory" title={t("memory")} accent="var(--color-memory)" status={formatPercent(usedPercent)} collapsed={false}>
+      <div className="btop-memory-grid">
+        <div className="btop-stat-lines">
+          <div className="btop-memory-total">
+            <span>{t("total")}:</span>
+            <strong>{formatBytes(snapshot.memory.totalBytes)}</strong>
           </div>
-        </div>
-        <div className="grid content-start gap-1">
-          <SegmentedMeter label={t("mem")} value={usedPercent} color="var(--color-memory)" segments={20} />
-          <SegmentedMeter label={t("swap")} value={swapPercent} color="var(--color-warning)" segments={20} />
+          <MemoryDotRow label={t("used")} value={formatBytes(snapshot.memory.usedBytes)} percent={usedPercent} color="var(--color-memory)" />
+          <MemoryDotRow label={t("available")} value={formatBytes(snapshot.memory.availableBytes)} percent={availablePercent} color="var(--color-warning)" />
+          <MemoryDotRow label={t("cache")} value={formatBytes(snapshot.memory.cachedBytes)} percent={cachedPercent} color="var(--color-network-tx)" />
+          <MemoryDotRow label={t("free")} value={formatBytes(freeBytes)} percent={freePercent} color="var(--color-cpu)" />
+          <div className="btop-memory-mini">
+            <span>{t("mem")}</span>
+            <strong>{Math.round(usedPercent)}%</strong>
+            <span>{t("swap")}</span>
+            <strong>{Math.round(swapPercent)}%</strong>
+          </div>
         </div>
       </div>
     </MetricPanel>

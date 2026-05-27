@@ -8,10 +8,10 @@ type NetworkThroughputChartProps = {
 };
 
 const CHART_WIDTH = 220;
-const MIN_COLUMNS = 24;
-const MAX_COLUMNS = 72;
+const MIN_COLUMNS = 56;
+const MAX_COLUMNS = 104;
 const ROWS_PER_DIRECTION = 8;
-const SECTION_GAP = 8;
+const SECTION_GAP = 10;
 
 function normalizeSeries(values: number[], columns: number) {
   const normalizedValues = values.length > 0 ? values.slice(-columns) : [0];
@@ -51,7 +51,7 @@ export function NetworkThroughputChart({
       preserveAspectRatio="none"
       aria-hidden="true"
     >
-      <rect width={CHART_WIDTH} height={height} fill="var(--color-input)" opacity="0.38" />
+      <rect width={CHART_WIDTH} height={height} fill="transparent" />
       {Array.from({ length: 7 }, (_, index) => {
         const x = Math.round((index / 6) * CHART_WIDTH);
         return (
@@ -63,7 +63,7 @@ export function NetworkThroughputChart({
             y2={gridBottom}
             stroke="var(--color-chart-grid)"
             strokeWidth="1"
-            opacity="0.26"
+            opacity="0.16"
           />
         );
       })}
@@ -78,7 +78,7 @@ export function NetworkThroughputChart({
             y2={y}
             stroke="var(--color-chart-grid)"
             strokeWidth="1"
-            opacity="0.28"
+            opacity="0.14"
           />
         );
       })}
@@ -106,7 +106,7 @@ export function NetworkThroughputChart({
               width={dotSize}
               height={dotSize}
               fill={filled ? rxColor : "var(--color-bar-track)"}
-              opacity={filled ? 0.44 + age * 0.56 : 0.18}
+              opacity={filled ? 0.5 + age * 0.5 : 0.055}
             />
           );
         }),
@@ -126,7 +126,7 @@ export function NetworkThroughputChart({
               width={dotSize}
               height={dotSize}
               fill={filled ? txColor : "var(--color-bar-track)"}
-              opacity={filled ? 0.44 + age * 0.56 : 0.18}
+              opacity={filled ? 0.5 + age * 0.5 : 0.055}
             />
           );
         }),

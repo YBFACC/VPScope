@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { NetworkThroughputChart } from "@/components/chart/NetworkThroughputChart";
+import { DotMatrixChart } from "@/components/chart/DotMatrixChart";
 import { MetricPanel } from "@/components/panel/MetricPanel";
 import { useI18n } from "@/i18n/useI18n";
 import { formatBytes, formatRate } from "@/lib/format";
@@ -142,33 +142,41 @@ export function NetworkPanel({ snapshot, networkByInterface }: NetworkPanelProps
       }
       actions={navigation}
       active={isActive}
+      collapsed={false}
       onActivate={() => setActiveDashboardPanel("network")}
-      className={
-        isActive
-          ? "shadow-[inset_0_0_0_1px_var(--color-border-strong),var(--shadow-panel)]"
-          : undefined
-      }
     >
       {currentInterface ? (
-        <div className="grid h-full min-h-0">
-          <div className="grid min-h-0 gap-2 xl:grid-cols-[minmax(0,1.2fr)_208px]">
+        <div className="btop-network-grid">
             <button
               type="button"
               onClick={() => setActiveDashboardPanel("network")}
-              className="pixel-card grid min-h-0 overflow-hidden rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-panel-raised)] p-2 text-left"
+              className="btop-network-chart"
             >
-              <div className="mb-1 flex items-center justify-end gap-2 text-[10px] uppercase tracking-normal text-[var(--color-text-muted)]">
+              <div className="mb-1 flex items-center justify-end gap-2 text-[11px] uppercase tracking-normal text-[var(--color-text-muted)]">
                 <span className={isActive ? "text-[var(--color-accent)]" : undefined}>L/R</span>
               </div>
               <div className="grid min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-1.5">
-                <div className="min-h-0 overflow-hidden">
-                  <NetworkThroughputChart
-                    rxValues={rxValues}
-                    txValues={txValues}
+                <div className="btop-network-dot-field">
+                  <DotMatrixChart
+                    values={rxValues}
                     max={maxRate}
-                    rxColor="var(--color-network-rx)"
-                    txColor="var(--color-network-tx)"
-                    height={112}
+                    rows={8}
+                    minColumns={68}
+                    maxColumns={120}
+                    color="var(--color-network-rx)"
+                    cellSize={5}
+                    dotSize={2.5}
+                  />
+                  <DotMatrixChart
+                    values={txValues}
+                    max={maxRate}
+                    rows={8}
+                    minColumns={68}
+                    maxColumns={120}
+                    color="var(--color-network-tx)"
+                    cellSize={5}
+                    dotSize={2.5}
+                    invert
                   />
                 </div>
                 <div className="flex items-center justify-between gap-3 text-[10px] uppercase tracking-normal text-[var(--color-text-muted)]">
@@ -178,13 +186,13 @@ export function NetworkPanel({ snapshot, networkByInterface }: NetworkPanelProps
               </div>
             </button>
 
-            <div className="grid gap-2 font-mono">
-              <div className="pixel-card grid gap-2 p-2">
+            <div className="btop-network-stats">
+              <div className="btop-rate-box">
                 <div className="flex items-baseline justify-between gap-3">
-                  <span className="text-[10px] uppercase tracking-normal text-[var(--color-text-muted)]">{t("download")}</span>
-                  <span className="text-base text-[var(--color-network-rx)] tabular-nums">{formatRate(currentInterface.rxBytesPerSec)}</span>
+                  <span>{t("download")}</span>
+                  <strong className="text-[var(--color-network-rx)]">{formatRate(currentInterface.rxBytesPerSec)}</strong>
                 </div>
-                <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[11px]">
+                <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
                   <span className="text-[var(--color-text-muted)]">{t("peak")}</span>
                   <span className="text-right text-[var(--color-text)] tabular-nums">{formatRate(historyPeak(rxHistory))}</span>
                   <span className="text-[var(--color-text-muted)]">{t("total")}</span>
@@ -192,27 +200,25 @@ export function NetworkPanel({ snapshot, networkByInterface }: NetworkPanelProps
                 </div>
               </div>
 
-              <div className="pixel-card grid gap-2 p-2">
+              <div className="btop-rate-box">
                 <div className="flex items-baseline justify-between gap-3">
-                  <span className="text-[10px] uppercase tracking-normal text-[var(--color-text-muted)]">{t("upload")}</span>
-                  <span className="text-base text-[var(--color-network-tx)] tabular-nums">{formatRate(currentInterface.txBytesPerSec)}</span>
+                  <span>{t("upload")}</span>
+                  <strong className="text-[var(--color-network-tx)]">{formatRate(currentInterface.txBytesPerSec)}</strong>
                 </div>
-                <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[11px]">
+                <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
                   <span className="text-[var(--color-text-muted)]">{t("peak")}</span>
                   <span className="text-right text-[var(--color-text)] tabular-nums">{formatRate(historyPeak(txHistory))}</span>
                   <span className="text-[var(--color-text-muted)]">{t("total")}</span>
                   <span className="text-right text-[var(--color-text)] tabular-nums">{formatBytes(currentInterface.txTotalBytes)}</span>
                 </div>
               </div>
-
-              <div className="pixel-card flex items-center justify-between gap-3 p-2 text-[11px]">
+              <div className="btop-rate-box flex items-center justify-between gap-3">
                 <span className="text-[var(--color-text-muted)]">{t("trafficSplit")}</span>
                 <span className="text-[var(--color-accent)] tabular-nums">
                   {formatRate(currentInterface.rxBytesPerSec + currentInterface.txBytesPerSec)}
                 </span>
               </div>
             </div>
-          </div>
         </div>
       ) : (
         <div className="pixel-card flex h-full items-center justify-center p-3 text-[11px] text-[var(--color-text-muted)]">

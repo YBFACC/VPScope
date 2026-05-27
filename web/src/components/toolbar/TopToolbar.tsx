@@ -27,17 +27,17 @@ export function TopToolbar() {
   }
 
   return (
-    <header className="grid gap-2 overflow-hidden rounded-[var(--radius-panel)] border border-[var(--color-border)] bg-[var(--color-panel-glass)] p-2 font-mono shadow-[var(--shadow-panel)] lg:grid-cols-[minmax(260px,1fr)_auto]">
+    <header className="btop-topbar grid gap-2 overflow-hidden border border-[var(--color-border)] bg-[var(--color-panel-glass)] px-2 py-1 font-mono shadow-[var(--shadow-panel)] lg:grid-cols-[minmax(260px,1fr)_auto]">
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-base font-semibold uppercase leading-none text-[var(--color-text)]">
+          <h1 className="text-sm font-semibold uppercase leading-none text-[var(--color-text)]">
             <span className="text-[var(--color-accent)]">VP</span>Scope
           </h1>
           <span className="pixel-badge px-2 py-0.5 text-[10px] uppercase text-[var(--color-text-muted)]">
             {displayTs ? formatDateTime(displayTs) : t("never")}
           </span>
         </div>
-        <p className="mt-1 truncate text-[11px] text-[var(--color-text-muted)]">
+        <p className="mt-0.5 truncate text-[10px] text-[var(--color-text-muted)]">
           {viewMode === "overview"
             ? `${t("allHosts")} · ${t("hostsConfigured", { count: hosts.length })}`
             : host
@@ -49,18 +49,18 @@ export function TopToolbar() {
         <button
           type="button"
           onClick={toggleClientMode}
-          className="h-8 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-input)] px-2 text-[10px] uppercase text-[var(--color-text-muted)] shadow-[inset_0_0_0_1px_var(--color-border-subtle)] hover:border-[var(--color-border-strong)] hover:text-[var(--color-accent)]"
+          className="h-6 rounded-none border border-[var(--color-border)] bg-[var(--color-input)] px-2 text-[10px] uppercase text-[var(--color-text-muted)] shadow-[inset_0_0_0_1px_var(--color-border-subtle)] hover:border-[var(--color-border-strong)] hover:text-[var(--color-accent)]"
           title={mode === "mock" ? t("switchToLiveData") : t("switchToDemoData")}
         >
           {mode === "mock" ? t("demoMode") : t("liveMode")}
         </button>
-        <div className="flex items-center gap-1 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-input)] p-1 shadow-[inset_0_0_0_1px_var(--color-border-subtle)]">
+        <div className="flex items-center gap-1 rounded-none border border-[var(--color-border)] bg-[var(--color-input)] p-0.5 shadow-[inset_0_0_0_1px_var(--color-border-subtle)]">
           {(["overview", "list"] as const).map((candidate) => (
             <button
               key={candidate}
               type="button"
               onClick={() => setViewMode(candidate)}
-              className="h-6 rounded-[var(--radius-control)] border border-transparent px-2 text-[10px] uppercase text-[var(--color-text-muted)] hover:text-[var(--color-accent)] data-[active=true]:border-[var(--color-border-strong)] data-[active=true]:bg-[var(--color-panel-muted)] data-[active=true]:text-[var(--color-accent)] data-[active=true]:shadow-[var(--shadow-glow)]"
+              className="h-5 rounded-none border border-transparent px-2 text-[10px] uppercase text-[var(--color-text-muted)] hover:text-[var(--color-accent)] data-[active=true]:border-[var(--color-border-strong)] data-[active=true]:bg-[var(--color-panel-muted)] data-[active=true]:text-[var(--color-accent)] data-[active=true]:shadow-[var(--shadow-glow)]"
               data-active={candidate === viewMode}
             >
               {t(candidate)}
@@ -70,7 +70,7 @@ export function TopToolbar() {
         <button
           type="button"
           onClick={() => setSettingsOpen(true)}
-          className="control-button icon-button grid h-8 w-8 place-items-center text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
+          className="control-button icon-button grid h-6 w-6 place-items-center text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
           title={t("settings")}
           aria-label={t("settings")}
         >

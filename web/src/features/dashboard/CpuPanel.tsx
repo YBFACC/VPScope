@@ -1,6 +1,5 @@
-import { Sparkline } from "@/components/chart/Sparkline";
-import { SegmentedMeter } from "@/components/meter/SegmentedMeter";
-import { UsageRing } from "@/components/meter/UsageRing";
+import { DotMatrixChart } from "@/components/chart/DotMatrixChart";
+import { TerminalMeter } from "@/components/meter/TerminalMeter";
 import { MetricPanel } from "@/components/panel/MetricPanel";
 import { useI18n } from "@/i18n/useI18n";
 import { formatPercent } from "@/lib/format";
@@ -12,46 +11,47 @@ type CpuPanelProps = {
   history: Array<HistoryPoint<number>>;
 };
 
+function formatUptime(totalSeconds: number) {
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+
+  return `${days}d ${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
+}
+
 export function CpuPanel({ snapshot, history }: CpuPanelProps) {
   const { t } = useI18n();
-  const corePeak = Math.max(0, ...snapshot.cpu.cores.map((core) => core.percent));
-  const coreAverage =
-    snapshot.cpu.cores.length > 0
-      ? snapshot.cpu.cores.reduce((total, core) => total + core.percent, 0) / snapshot.cpu.cores.length
-      : snapshot.cpu.totalPercent;
+  const historyValues = history.map((point) => point.value);
 
   return (
-    <MetricPanel panelId="cpu" title={t("cpu")} accent="var(--color-cpu)" status={formatPercent(snapshot.cpu.totalPercent)}>
-      <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-2">
-        <div className="grid min-h-0 grid-cols-[94px_minmax(0,1fr)] gap-2">
-          <UsageRing value={snapshot.cpu.totalPercent} label={t("cpu")} color="var(--color-cpu)" size={92} />
-          <div className="grid min-h-0 grid-rows-[auto_48px] gap-1.5">
-            <div className="grid grid-cols-2 gap-1.5 font-mono text-[10px]">
-              <div className="pixel-card px-2 py-1">
-                <div className="uppercase text-[var(--color-text-muted)]">{t("average")}</div>
-                <div className="mt-0.5 text-xs text-[var(--color-text)] tabular-nums">{formatPercent(coreAverage)}</div>
-              </div>
-              <div className="pixel-card px-2 py-1">
-                <div className="uppercase text-[var(--color-text-muted)]">{t("peak")}</div>
-                <div className="mt-0.5 text-xs text-[var(--color-cpu)] tabular-nums">{formatPercent(corePeak)}</div>
-              </div>
-            </div>
-            <div className="pixel-card min-h-0 p-1.5">
-              <Sparkline
-                values={history.map((point) => point.value)}
-                color="var(--color-cpu)"
-                fillColor="var(--color-chart-fill)"
-                max={100}
-                strokeWidth={2.4}
-              />
-            </div>
-          </div>
+    <MetricPanel panelId="cpu" title={t("cpu")} accent="var(--color-cpu)" status={formatPercent(snapshot.cpu.totalPercent)} collapsed={false}>
+      <div className="btop-cpu-grid">
+        <div className="btop-cpu-chart">
+          <DotMatrixChart
+            values={historyValues}
+            color="var(--color-cpu)"
+            max={100}
+            rows={20}
+            minColumns={132}
+            maxColumns={220}
+            cellSize={4}
+            dotSize={2}
+            inactiveOpacity={0.1}
+            minActiveRows={1}
+          />
+          <div className="btop-faint-label">{t("uptime")} {formatUptime(snapshot.system.uptimeSec)}</div>
         </div>
-        <div className="scrollbar-none min-h-0 overflow-auto">
-          <div className="grid gap-1">
-            {snapshot.cpu.cores.map((core) => (
-              <SegmentedMeter key={core.id} label={core.id} value={core.percent} color="var(--color-cpu)" segments={16} />
-            ))}
+        <div className="btop-cpu-side">
+          <div className="btop-side-title">
+            <span>{snapshot.system.hostname}</span>
+            <span>{Math.round(snapshot.cpu.totalPercent)}</span>
+          </div>
+          <TerminalMeter label="CPU" value={snapshot.cpu.totalPercent} color="var(--color-cpu)" segments={18} />
+          {snapshot.cpu.cores.slice(0, 8).map((core) => (
+            <TerminalMeter key={core.id} label={core.id.toUpperCase()} value={core.percent} color="var(--color-cpu)" segments={18} />
+          ))}
+          <div className="btop-load">
+            LAV: {snapshot.system.loadAvg.map((load) => load.toFixed(2)).join(" ")}
           </div>
         </div>
       </div>

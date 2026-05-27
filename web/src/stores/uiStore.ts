@@ -11,7 +11,10 @@ export type DashboardPanelId = (typeof dashboardPanelIds)[number];
 const collapsedPanelsStorageKey = "vpscope-collapsed-panels";
 const panelOrderStorageKey = "vpscope-panel-order";
 const selectedNetworkInterfaceStorageKey = "vpscope-network-selected-ifaces";
+const processTableRefreshMsStorageKey = "vpscope-process-table-refresh-ms";
 const dashboardPanelIdSet = new Set<DashboardPanelId>(dashboardPanelIds);
+export const processTableRefreshOptionsMs = [2_000, 5_000, 10_000, 30_000] as const;
+export type ProcessTableRefreshMs = (typeof processTableRefreshOptionsMs)[number];
 
 type PanelMoveDirection = "up" | "down";
 
@@ -88,6 +91,20 @@ function writeSelectedNetworkInterfaces(selectedNetworkInterfaces: Record<HostId
   localStorage.setItem(selectedNetworkInterfaceStorageKey, JSON.stringify(selectedNetworkInterfaces));
 }
 
+function isProcessTableRefreshMs(value: number): value is ProcessTableRefreshMs {
+  return processTableRefreshOptionsMs.some((option) => option === value);
+}
+
+function readProcessTableRefreshMs(): ProcessTableRefreshMs {
+  const value = Number(localStorage.getItem(processTableRefreshMsStorageKey));
+
+  return isProcessTableRefreshMs(value) ? value : 5_000;
+}
+
+function writeProcessTableRefreshMs(refreshMs: ProcessTableRefreshMs) {
+  localStorage.setItem(processTableRefreshMsStorageKey, String(refreshMs));
+}
+
 function networkInterfaceIndex(selectedInterface: string | undefined, interfaces: string[]) {
   if (!selectedInterface || interfaces.length === 0) {
     return -1;
@@ -104,6 +121,7 @@ type UiStore = {
   processSortBy: ProcessListPayload["sortBy"];
   processSortDirection: ProcessListPayload["sortDirection"];
   focusedProcessIndex: number;
+  processTableRefreshMs: ProcessTableRefreshMs;
   settingsOpen: boolean;
   collapsedPanels: DashboardPanelId[];
   panelOrder: DashboardPanelId[];
@@ -114,6 +132,7 @@ type UiStore = {
   setViewMode: (viewMode: "overview" | "list") => void;
   setSearch: (search: string) => void;
   setProcessSort: (sortBy: ProcessListPayload["sortBy"]) => void;
+  setProcessTableRefreshMs: (refreshMs: ProcessTableRefreshMs) => void;
   moveFocusedProcess: (delta: number, rowCount: number) => void;
   setSettingsOpen: (settingsOpen: boolean) => void;
   togglePanelCollapsed: (panelId: DashboardPanelId) => void;
@@ -131,6 +150,7 @@ const initialLocale = (localStorage.getItem("vpscope-locale") === "en-US" ? "en-
 const initialCollapsedPanels = readCollapsedPanels();
 const initialPanelOrder = readPanelOrder();
 const initialSelectedNetworkInterfaces = readSelectedNetworkInterfaces();
+const initialProcessTableRefreshMs = readProcessTableRefreshMs();
 
 export const useUiStore = create<UiStore>((set, get) => ({
   themeId: initialTheme.id,
@@ -140,6 +160,7 @@ export const useUiStore = create<UiStore>((set, get) => ({
   processSortBy: "cpu",
   processSortDirection: "desc",
   focusedProcessIndex: 0,
+  processTableRefreshMs: initialProcessTableRefreshMs,
   settingsOpen: false,
   collapsedPanels: initialCollapsedPanels,
   panelOrder: initialPanelOrder,
@@ -165,6 +186,10 @@ export const useUiStore = create<UiStore>((set, get) => ({
       processSortBy: sortBy,
       processSortDirection: processSortBy === sortBy && processSortDirection === "desc" ? "asc" : "desc",
     });
+  },
+  setProcessTableRefreshMs(refreshMs) {
+    writeProcessTableRefreshMs(refreshMs);
+    set({ processTableRefreshMs: refreshMs });
   },
   moveFocusedProcess(delta, rowCount) {
     set((state) => ({

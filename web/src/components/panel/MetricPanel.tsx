@@ -36,7 +36,7 @@ export function MetricPanel({
   const movePanel = useUiStore((state) => state.movePanel);
   const togglePanelCollapsed = useUiStore((state) => state.togglePanelCollapsed);
   const isCollapsed = collapsed ?? (panelId ? collapsedPanels.includes(panelId) : false);
-  const canToggle = Boolean(panelId);
+  const canToggle = Boolean(panelId) && collapsed === undefined;
   const visiblePanelOrder = panelOrder.filter((candidate) => !collapsedPanels.includes(candidate));
   const visiblePanelIndex = panelId ? visiblePanelOrder.indexOf(panelId) : -1;
   const canMoveUp = canToggle && visiblePanelIndex > 0;
@@ -59,7 +59,7 @@ export function MetricPanel({
   return (
     <section
       className={clsx(
-        "metric-panel-shell grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-[var(--radius-panel)] border border-[var(--color-border)] p-3 font-mono shadow-[var(--shadow-panel)]",
+        "metric-panel-shell grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden border border-[var(--color-border)] px-2 pb-2 pt-1 font-mono",
         className,
       )}
       data-collapsed={isCollapsed}
@@ -68,8 +68,7 @@ export function MetricPanel({
       onFocusCapture={onActivate}
       style={{ "--panel-accent": accent } as CSSProperties}
     >
-      <div className="metric-panel-accent" />
-      <div className="metric-panel-header mb-2.5 flex min-h-5 items-center justify-between gap-2">
+      <div className="metric-panel-header flex min-h-5 items-center justify-between gap-2">
         {canToggle ? (
           <button
             type="button"
@@ -77,7 +76,7 @@ export function MetricPanel({
             aria-expanded={!isCollapsed}
             aria-label={`${toggleLabel}: ${title}`}
             title={`${toggleLabel}: ${title}`}
-            className="metric-panel-title-button min-w-0 font-mono text-[11px] font-semibold uppercase tracking-normal text-[var(--color-text)]"
+            className="metric-panel-title-button min-w-0 font-mono text-[13px] font-semibold uppercase tracking-normal text-[var(--color-text)]"
           >
             <span
               className="pixel-dot mr-1.5 align-middle"
@@ -94,7 +93,7 @@ export function MetricPanel({
             {title}
           </h2>
         )}
-        <div className="flex min-w-0 items-center gap-2 font-mono text-xs text-[var(--color-text-muted)]">
+        <div className="flex min-w-0 items-center gap-1.5 font-mono text-[12px] text-[var(--color-text-muted)]">
           {status}
           {!isCollapsed ? actions : null}
           {canToggle ? (
@@ -167,7 +166,7 @@ export function MetricPanel({
           ) : null}
         </div>
       </div>
-      {!isCollapsed ? <div className="min-h-0">{children}</div> : null}
+      {!isCollapsed ? <div className="min-h-0 overflow-hidden">{children}</div> : null}
     </section>
   );
 }
