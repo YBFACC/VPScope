@@ -25,7 +25,7 @@ export function ProcessPanel({ processes }: ProcessPanelProps) {
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           placeholder={t("filterProcesses")}
-          className="h-7 w-48 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-input)] px-2 font-mono text-xs text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-border-strong)]"
+          className="h-7 w-48 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-input)] px-2 font-mono text-[11px] uppercase text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-border-strong)]"
         />
       }
       className="grid grid-rows-[auto_minmax(0,1fr)]"

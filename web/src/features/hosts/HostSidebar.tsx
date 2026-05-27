@@ -137,7 +137,7 @@ function HostDetailsTooltip({ host, snapshot, connection }: HostDetailsTooltipPr
         <div
           id={tooltipId}
           role="tooltip"
-          className="fixed z-50 rounded-[var(--radius-panel)] border border-[var(--color-border)] bg-[var(--color-panel)] p-2 font-mono text-xs text-[var(--color-text)] shadow-[var(--shadow-panel)] backdrop-blur"
+        className="fixed z-50 rounded-[var(--radius-panel)] border border-[var(--color-border)] bg-[var(--color-panel)] p-2 font-mono text-xs text-[var(--color-text)] shadow-[var(--shadow-panel)]"
           style={{ left: tooltipLeft, width: tooltipWidth, ...tooltipPosition }}
         >
           <div className="flex min-w-0 items-center justify-between gap-2 border-b border-[var(--color-border-subtle)] pb-2">
@@ -150,7 +150,7 @@ function HostDetailsTooltip({ host, snapshot, connection }: HostDetailsTooltipPr
             {details.map(([label, value]) => (
               <div
                 key={label}
-                className="min-w-0 rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] px-2 py-1.5"
+                className="pixel-card min-w-0 px-2 py-1.5"
               >
                 <dt className="text-[10px] text-[var(--color-text-muted)]">{label}</dt>
                 <dd className="mt-1 truncate tabular-nums text-[11px] text-[var(--color-text)]">{value}</dd>
@@ -158,7 +158,7 @@ function HostDetailsTooltip({ host, snapshot, connection }: HostDetailsTooltipPr
             ))}
           </dl>
           {connection?.lastError ? (
-            <div className="mt-2 rounded-[var(--radius-control)] border border-[var(--color-danger)] bg-[var(--color-input)] p-2 text-[11px] text-[var(--color-danger)]">
+            <div className="mt-2 rounded-[var(--radius-control)] border border-[var(--color-danger)] bg-[var(--color-input)] p-2 text-[11px] text-[var(--color-danger)] shadow-[0_0_8px_rgba(255,77,106,0.16)]">
               <span className="tabular-nums">{connection.lastError.code}</span>: {connection.lastError.message}
             </div>
           ) : null}
@@ -185,13 +185,13 @@ export function HostSidebar() {
   const [formOpen, setFormOpen] = useState(false);
 
   return (
-    <aside className="grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-2 overflow-hidden rounded-[var(--radius-panel)] border border-[var(--color-border)] bg-[var(--color-panel-glass)] p-3 shadow-[var(--shadow-panel)] backdrop-blur">
+    <aside className="grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-2 overflow-hidden rounded-[var(--radius-panel)] border border-[var(--color-border)] bg-[var(--color-panel-glass)] p-2 font-mono shadow-[var(--shadow-panel)]">
       <div className="flex min-w-0 items-start justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2 font-mono text-sm font-semibold text-[var(--color-text)]">
-          <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--color-accent)] shadow-[var(--shadow-glow)]" />
+        <div className="flex min-w-0 items-center gap-2 text-xs font-semibold uppercase text-[var(--color-text)]">
+          <span className="pixel-dot shrink-0 text-[var(--color-accent)]" />
           <span className="min-w-0 truncate">{t("hosts")}</span>
         </div>
-        <div className="shrink-0 whitespace-nowrap text-right font-mono text-[11px] text-[var(--color-text-muted)]">
+        <div className="shrink-0 whitespace-nowrap text-right text-[10px] uppercase text-[var(--color-text-muted)]">
           {t("hostsConfigured", { count: hosts.length })}
         </div>
       </div>
@@ -201,28 +201,28 @@ export function HostSidebar() {
           <div
             key={host.id}
             onClick={() => selectHost(host.id)}
-            className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-3 rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] p-2 transition-colors hover:border-[var(--color-border)] hover:bg-[var(--color-row-hover)] data-[active=true]:border-[var(--color-border-strong)] data-[active=true]:bg-[var(--color-panel-muted)] data-[active=true]:shadow-[var(--shadow-glow)]"
+            className="pixel-card grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-2 p-2 transition-colors hover:border-[var(--color-border)] hover:bg-[var(--color-row-hover)] data-[active=true]:border-[var(--color-border-strong)] data-[active=true]:bg-[var(--color-panel-muted)] data-[active=true]:shadow-[inset_3px_0_0_var(--color-accent),var(--shadow-glow)]"
             data-active={host.id === selectedHostId}
           >
             <div className="min-w-0">
               <button type="button" onClick={() => selectHost(host.id)} className="block min-w-0 text-left">
                 <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-                  <span className="min-w-0 truncate font-mono text-sm text-[var(--color-text)]">{host.name}</span>
+                  <span className="min-w-0 truncate text-xs font-semibold uppercase text-[var(--color-text)]">{host.name}</span>
                   <HostConnectionBadge state={connectionStates[host.id]} />
                 </div>
-                <div className="mt-1 truncate font-mono text-[11px] text-[var(--color-text-muted)]">
+                <div className="mt-1 truncate text-[10px] text-[var(--color-text-muted)]">
                   {host.auth.username}@{host.address}:{host.port}
                 </div>
               </button>
               <div className="mt-2 flex min-w-0 flex-wrap gap-1 overflow-hidden">
                 {host.tags.map((tag) => (
-                  <span key={tag} className="rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-panel-muted)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--color-text-muted)]">
+                  <span key={tag} className="pixel-badge px-1.5 py-0.5 text-[9px] uppercase text-[var(--color-text-muted)]">
                     {tag}
                   </span>
                 ))}
               </div>
               {terminalErrorsByHost[host.id] ? (
-                <div className="mt-1 truncate font-mono text-[10px] text-[var(--color-danger)]">
+                <div className="mt-1 truncate text-[10px] text-[var(--color-danger)]">
                   {t("openTerminalFailed")}: {terminalErrorsByHost[host.id]?.message}
                 </div>
               ) : null}

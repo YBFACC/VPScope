@@ -223,6 +223,8 @@ type HostSnapshot = {
 };
 ```
 
+`disks` 表示适合监控展示的文件系统挂载，不是 `df -P` 的原始全量输出；后端过滤虚拟、固件、容器层和运行时挂载，例如 `tmpfs`、`efivarfs`、`proc`、`sysfs`、`cgroup*`、`overlay`、`/run/*`、`/dev/*`。
+
 采集层保留最近 N 个 snapshot，UI 层只消费派生数据：
 
 - 当前值

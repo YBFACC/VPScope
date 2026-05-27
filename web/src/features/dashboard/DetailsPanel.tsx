@@ -35,16 +35,16 @@ export function DetailsPanel({ host, snapshot, connection }: DetailsPanelProps) 
 
   return (
     <MetricPanel title={t("details")} accent="var(--color-accent)" status={connectionStatus}>
-      <dl className="grid grid-cols-2 gap-2 font-mono text-xs xl:grid-cols-3">
+      <dl className="grid grid-cols-2 gap-1.5 font-mono text-[11px] xl:grid-cols-3">
         {details.map(([label, value]) => (
-          <div key={label} className="min-w-0 rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] px-2 py-1.5">
-            <dt className="text-[var(--color-text-muted)]">{label}</dt>
+          <div key={label} className="pixel-card min-w-0 px-2 py-1.5">
+            <dt className="text-[10px] uppercase text-[var(--color-text-muted)]">{label}</dt>
             <dd className="mt-1 truncate tabular-nums text-[var(--color-text)]">{value}</dd>
           </div>
         ))}
       </dl>
       {connection?.lastError ? (
-        <div className="mt-3 rounded-[var(--radius-control)] border border-[var(--color-danger)] bg-[var(--color-input)] p-2 font-mono text-xs text-[var(--color-danger)] shadow-[var(--shadow-glow)]">
+        <div className="mt-3 rounded-[var(--radius-control)] border border-[var(--color-danger)] bg-[var(--color-input)] p-2 font-mono text-xs text-[var(--color-danger)] shadow-[0_0_8px_rgba(255,77,106,0.18)]">
           {connection.lastError.code}: {connection.lastError.message}
         </div>
       ) : null}

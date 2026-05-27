@@ -29,11 +29,11 @@ export function NetworkPanel({ snapshot, rxHistory, txHistory }: NetworkPanelPro
       accent="var(--color-network-rx)"
       status={t("ifaces", { count: snapshot.network.length })}
     >
-      <div className="grid h-full min-h-0 grid-rows-[auto_auto_minmax(0,1fr)] gap-3">
-        <div className="grid min-h-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2">
-          <div className="grid min-h-0 grid-rows-[auto_48px] gap-2 rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] p-2">
+      <div className="grid h-full min-h-0 grid-rows-[auto_auto_minmax(0,1fr)] gap-2">
+        <div className="grid min-h-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-1.5">
+          <div className="pixel-card grid min-h-0 grid-rows-[auto_48px] gap-1.5 p-1.5">
             <div className="flex items-baseline justify-between gap-2 font-mono">
-              <span className="text-[11px] uppercase text-[var(--color-text-muted)]">{t("rx")}</span>
+              <span className="text-[10px] uppercase text-[var(--color-text-muted)]">{t("rx")}</span>
               <span className="truncate text-sm text-[var(--color-network-rx)] tabular-nums">{formatRate(rxTotalRate)}</span>
             </div>
             <Sparkline
@@ -44,9 +44,9 @@ export function NetworkPanel({ snapshot, rxHistory, txHistory }: NetworkPanelPro
               strokeWidth={2.2}
             />
           </div>
-          <div className="grid min-h-0 grid-rows-[auto_48px] gap-2 rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] p-2">
+          <div className="pixel-card grid min-h-0 grid-rows-[auto_48px] gap-1.5 p-1.5">
             <div className="flex items-baseline justify-between gap-2 font-mono">
-              <span className="text-[11px] uppercase text-[var(--color-text-muted)]">{t("tx")}</span>
+              <span className="text-[10px] uppercase text-[var(--color-text-muted)]">{t("tx")}</span>
               <span className="truncate text-sm text-[var(--color-network-tx)] tabular-nums">{formatRate(txTotalRate)}</span>
             </div>
             <Sparkline
@@ -58,14 +58,14 @@ export function NetworkPanel({ snapshot, rxHistory, txHistory }: NetworkPanelPro
             />
           </div>
         </div>
-        <div className="grid gap-1.5 rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] p-2 font-mono text-[11px]">
+        <div className="pixel-card grid gap-1.5 p-1.5 font-mono text-[10px]">
           <div className="flex items-center justify-between gap-2 text-[var(--color-text-muted)]">
             <span>{t("trafficSplit")}</span>
             <span className="tabular-nums">
               {t("rx")} {formatPercent(rxShare)} / {t("tx")} {formatPercent(txShare)}
             </span>
           </div>
-          <div className="flex h-3 overflow-hidden rounded-[var(--radius-control)] bg-[var(--color-bar-track)]">
+          <div className="flex h-3 overflow-hidden border border-[var(--color-border-subtle)] bg-[var(--color-bar-track)] p-px">
             <span
               className="h-full transition-[width] duration-300"
               style={{ width: `${rxShare}%`, backgroundColor: "var(--color-network-rx)" }}
@@ -76,11 +76,11 @@ export function NetworkPanel({ snapshot, rxHistory, txHistory }: NetworkPanelPro
             />
           </div>
         </div>
-        <div className="scrollbar-none min-h-0 space-y-1.5 overflow-auto font-mono text-xs">
+        <div className="scrollbar-none min-h-0 space-y-1.5 overflow-auto font-mono text-[11px]">
           {snapshot.network.map((iface) => (
             <div
               key={iface.iface}
-              className="grid min-w-0 gap-1.5 rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] px-2 py-1.5"
+              className="pixel-card grid min-w-0 gap-1.5 px-2 py-1.5"
             >
               <div className="grid min-w-0 grid-cols-[72px_minmax(0,1fr)_auto] items-center gap-2">
                 <span className="truncate text-[var(--color-text)]">{iface.iface}</span>
@@ -96,6 +96,7 @@ export function NetworkPanel({ snapshot, rxHistory, txHistory }: NetworkPanelPro
                   value={(iface.rxBytesPerSec / maxIfaceRate) * 100}
                   detail={`${t("rx")} ${formatRate(iface.rxBytesPerSec)}`}
                   color="var(--color-network-rx)"
+                  thresholdGradient={false}
                   compact
                   segments={12}
                 />
@@ -103,6 +104,7 @@ export function NetworkPanel({ snapshot, rxHistory, txHistory }: NetworkPanelPro
                   value={(iface.txBytesPerSec / maxIfaceRate) * 100}
                   detail={`${t("tx")} ${formatRate(iface.txBytesPerSec)}`}
                   color="var(--color-network-tx)"
+                  thresholdGradient={false}
                   compact
                   segments={12}
                 />

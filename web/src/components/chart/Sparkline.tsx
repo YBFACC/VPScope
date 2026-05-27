@@ -19,37 +19,61 @@ export function Sparkline({
 }: SparklineProps) {
   const width = 220;
   const ceiling = max ?? Math.max(1, ...values);
-  const normalizedValues = values.length > 0 ? values : [0];
-  const points =
-    normalizedValues.length > 1
-      ? normalizedValues
-          .map((value, index) => {
-            const x = (index / (normalizedValues.length - 1)) * width;
-            const y = height - (Math.max(0, Math.min(value, ceiling)) / ceiling) * (height - 4) - 2;
-            return `${x.toFixed(1)},${y.toFixed(1)}`;
-          })
-          .join(" ")
-      : "";
-  const areaPoints = points ? `0,${height} ${points} ${width},${height}` : "";
+  const rows = 10;
+  const columns = Math.min(72, Math.max(24, values.length || 24));
+  const normalizedValues = values.length > 0 ? values.slice(-columns) : [0];
+  const paddedValues =
+    normalizedValues.length < columns
+      ? [...Array.from({ length: columns - normalizedValues.length }, () => 0), ...normalizedValues]
+      : normalizedValues;
+  const gap = Math.max(1, Math.round(strokeWidth));
+  const cellWidth = width / columns;
+  const cellHeight = height / rows;
+  const dotSize = Math.max(2, Math.min(cellWidth, cellHeight) - gap);
+  const xOffset = (cellWidth - dotSize) / 2;
+  const yOffset = (cellHeight - dotSize) / 2;
+  const activeCells = paddedValues.map((value) => {
+    const clamped = Math.max(0, Math.min(value, ceiling));
+    return Math.round((clamped / ceiling) * rows);
+  });
 
   return (
-    <svg className="block h-full w-full overflow-hidden" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
+    <svg className="pixel-sparkline block h-full w-full overflow-hidden" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
+      <rect width={width} height={height} fill="var(--color-input)" opacity="0.32" />
       {showGrid ? (
         <>
-          <path d={`M 0 ${height - 1} H ${width}`} stroke="var(--color-chart-grid)" strokeWidth="1" />
-          <path d={`M 0 ${Math.round(height * 0.34)} H ${width}`} stroke="var(--color-chart-grid)" strokeDasharray="2 5" strokeWidth="1" />
-          <path d={`M 0 ${Math.round(height * 0.67)} H ${width}`} stroke="var(--color-chart-grid)" strokeDasharray="2 5" strokeWidth="1" />
+          {Array.from({ length: 7 }, (_, index) => {
+            const x = Math.round((index / 6) * width);
+            return <line key={`v-${index}`} x1={x} x2={x} y1="0" y2={height} stroke="var(--color-chart-grid)" strokeWidth="1" opacity="0.26" />;
+          })}
+          {Array.from({ length: 3 }, (_, index) => {
+            const y = Math.round(((index + 1) / 4) * height);
+            return <line key={`h-${index}`} x1="0" x2={width} y1={y} y2={y} stroke="var(--color-chart-grid)" strokeWidth="1" opacity="0.38" />;
+          })}
+          <line x1="0" x2={width} y1={height - 1} y2={height - 1} stroke="var(--color-chart-grid)" strokeWidth="1" />
         </>
       ) : null}
-      {areaPoints ? <polygon points={areaPoints} fill={fillColor} /> : null}
-      <polyline
-        points={points}
-        fill="none"
-        stroke={color}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={strokeWidth}
-      />
+      <rect width={width} height={height} fill={fillColor} opacity="0.18" />
+      {activeCells.map((activeRows, columnIndex) =>
+        Array.from({ length: rows }, (_, rowIndex) => {
+          const filled = rows - rowIndex <= activeRows;
+          const age = columnIndex / Math.max(1, columns - 1);
+          const x = Math.round(columnIndex * cellWidth + xOffset);
+          const y = Math.round(rowIndex * cellHeight + yOffset);
+
+          return (
+            <rect
+              key={`${columnIndex}-${rowIndex}`}
+              x={x}
+              y={y}
+              width={dotSize}
+              height={dotSize}
+              fill={filled ? color : "var(--color-bar-track)"}
+              opacity={filled ? 0.48 + age * 0.52 : 0.34}
+            />
+          );
+        }),
+      )}
     </svg>
   );
 }

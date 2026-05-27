@@ -22,21 +22,21 @@ export function CpuPanel({ snapshot, history }: CpuPanelProps) {
 
   return (
     <MetricPanel panelId="cpu" title={t("cpu")} accent="var(--color-cpu)" status={formatPercent(snapshot.cpu.totalPercent)}>
-      <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-3">
-        <div className="grid min-h-0 grid-cols-[94px_minmax(0,1fr)] gap-3">
+      <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-2">
+        <div className="grid min-h-0 grid-cols-[94px_minmax(0,1fr)] gap-2">
           <UsageRing value={snapshot.cpu.totalPercent} label={t("cpu")} color="var(--color-cpu)" size={92} />
-          <div className="grid min-h-0 grid-rows-[auto_48px] gap-2">
-            <div className="grid grid-cols-2 gap-2 font-mono text-[11px]">
-              <div className="rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] px-2 py-1">
-                <div className="text-[var(--color-text-muted)]">{t("average")}</div>
+          <div className="grid min-h-0 grid-rows-[auto_48px] gap-1.5">
+            <div className="grid grid-cols-2 gap-1.5 font-mono text-[10px]">
+              <div className="pixel-card px-2 py-1">
+                <div className="uppercase text-[var(--color-text-muted)]">{t("average")}</div>
                 <div className="mt-0.5 text-xs text-[var(--color-text)] tabular-nums">{formatPercent(coreAverage)}</div>
               </div>
-              <div className="rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] px-2 py-1">
-                <div className="text-[var(--color-text-muted)]">{t("peak")}</div>
+              <div className="pixel-card px-2 py-1">
+                <div className="uppercase text-[var(--color-text-muted)]">{t("peak")}</div>
                 <div className="mt-0.5 text-xs text-[var(--color-cpu)] tabular-nums">{formatPercent(corePeak)}</div>
               </div>
             </div>
-            <div className="min-h-0 rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] p-2">
+            <div className="pixel-card min-h-0 p-1.5">
               <Sparkline
                 values={history.map((point) => point.value)}
                 color="var(--color-cpu)"
@@ -48,7 +48,7 @@ export function CpuPanel({ snapshot, history }: CpuPanelProps) {
           </div>
         </div>
         <div className="scrollbar-none min-h-0 overflow-auto">
-          <div className="grid gap-1.5">
+          <div className="grid gap-1">
             {snapshot.cpu.cores.map((core) => (
               <SegmentedMeter key={core.id} label={core.id} value={core.percent} color="var(--color-cpu)" segments={16} />
             ))}

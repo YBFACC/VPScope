@@ -17,17 +17,17 @@ export function TopToolbar() {
   const displayTs = viewMode === "overview" ? latestSnapshotTs : snapshot?.ts;
 
   return (
-    <header className="grid gap-2 overflow-hidden rounded-[var(--radius-panel)] border border-[var(--color-border)] bg-[var(--color-panel-glass)] p-3 shadow-[var(--shadow-panel)] backdrop-blur lg:grid-cols-[minmax(260px,1fr)_auto]">
+    <header className="grid gap-2 overflow-hidden rounded-[var(--radius-panel)] border border-[var(--color-border)] bg-[var(--color-panel-glass)] p-2 font-mono shadow-[var(--shadow-panel)] lg:grid-cols-[minmax(260px,1fr)_auto]">
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
-          <h1 className="font-mono text-lg font-semibold leading-none text-[var(--color-text)]">
+          <h1 className="text-base font-semibold uppercase leading-none text-[var(--color-text)]">
             <span className="text-[var(--color-accent)]">VP</span>Scope
           </h1>
-          <span className="rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] px-2 py-0.5 font-mono text-xs text-[var(--color-text-muted)]">
+          <span className="pixel-badge px-2 py-0.5 text-[10px] uppercase text-[var(--color-text-muted)]">
             {displayTs ? formatDateTime(displayTs) : t("never")}
           </span>
         </div>
-        <p className="mt-1 truncate text-xs text-[var(--color-text-muted)]">
+        <p className="mt-1 truncate text-[11px] text-[var(--color-text-muted)]">
           {viewMode === "overview"
             ? `${t("allHosts")} · ${t("hostsConfigured", { count: hosts.length })}`
             : host
@@ -36,13 +36,13 @@ export function TopToolbar() {
         </p>
       </div>
       <div className="flex min-w-0 items-center justify-end gap-1.5">
-        <div className="flex items-center gap-1 rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] p-1 shadow-[inset_0_1px_0_var(--color-border-subtle)]">
+        <div className="flex items-center gap-1 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-input)] p-1 shadow-[inset_0_0_0_1px_var(--color-border-subtle)]">
           {(["overview", "list"] as const).map((candidate) => (
             <button
               key={candidate}
               type="button"
               onClick={() => setViewMode(candidate)}
-              className="h-6 rounded-[var(--radius-control)] px-2 font-mono text-[11px] text-[var(--color-text-muted)] hover:text-[var(--color-text)] data-[active=true]:bg-[var(--color-panel-muted)] data-[active=true]:text-[var(--color-text)] data-[active=true]:shadow-[var(--shadow-glow)]"
+              className="h-6 rounded-[var(--radius-control)] border border-transparent px-2 text-[10px] uppercase text-[var(--color-text-muted)] hover:text-[var(--color-accent)] data-[active=true]:border-[var(--color-border-strong)] data-[active=true]:bg-[var(--color-panel-muted)] data-[active=true]:text-[var(--color-accent)] data-[active=true]:shadow-[var(--shadow-glow)]"
               data-active={candidate === viewMode}
             >
               {t(candidate)}

@@ -24,10 +24,10 @@ export function HostConnectionBadge({ state }: HostConnectionBadgeProps) {
 
   return (
     <span
-      className="inline-flex min-w-0 max-w-20 items-center gap-1.5 overflow-hidden rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-normal"
+      className="pixel-badge inline-flex min-w-0 max-w-20 items-center gap-1.5 overflow-hidden px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-normal"
       style={{ color: colors[status] }}
     >
-      <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: colors[status], boxShadow: `0 0 10px ${colors[status]}` }} />
+      <span className="h-1.5 w-1.5 shrink-0 rounded-[1px]" style={{ backgroundColor: colors[status], boxShadow: `0 0 10px ${colors[status]}` }} />
       <span className="min-w-0 truncate">{labels[status]}</span>
     </span>
   );

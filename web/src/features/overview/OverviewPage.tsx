@@ -78,17 +78,27 @@ function healthColor(health: HostHealth) {
 
 function MiniMeter({ value, color }: { value?: number; color: string }) {
   const percent = value === undefined ? 0 : Math.max(0, Math.min(100, value));
+  const segments = 18;
+  const activeSegments = percent > 0 ? Math.max(1, Math.round((percent / 100) * segments)) : 0;
 
   return (
-    <div className="h-2 min-w-14 overflow-hidden rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-bar-track)]">
-      <div
-        className="h-full rounded-[var(--radius-control)] transition-[width] duration-300"
-        style={{
-          width: `${percent}%`,
-          backgroundColor: value === undefined ? "var(--color-border)" : color,
-          boxShadow: value === undefined ? undefined : `0 0 12px ${color}`,
-        }}
-      />
+    <div className="grid h-3 min-w-14 grid-flow-col gap-px border border-[var(--color-border-subtle)] bg-[var(--color-bar-track)] p-px">
+      {Array.from({ length: segments }, (_, index) => {
+        const active = index < activeSegments;
+        const fill = value === undefined ? "var(--color-border)" : color;
+
+        return (
+          <span
+            key={index}
+            className="min-w-0 transition-colors duration-300"
+            style={{
+              backgroundColor: active ? fill : "transparent",
+              boxShadow: active && value !== undefined ? `0 0 6px ${fill}` : undefined,
+              opacity: active ? 1 : 0.45,
+            }}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -162,18 +172,18 @@ export function OverviewPage({
   const { t } = useI18n();
 
   return (
-    <section className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-2 overflow-hidden rounded-[var(--radius-panel)] border border-[var(--color-border)] bg-[var(--color-panel-glass)] p-3 shadow-[var(--shadow-panel)] backdrop-blur">
+    <section className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-2 overflow-hidden rounded-[var(--radius-panel)] border border-[var(--color-border)] bg-[var(--color-panel-glass)] p-2 font-mono shadow-[var(--shadow-panel)]">
       <div className="flex min-h-7 min-w-0 items-center justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="truncate font-mono text-sm font-semibold uppercase tracking-normal text-[var(--color-text)]">
-            <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-[var(--color-accent)] align-middle shadow-[var(--shadow-glow)]" />
+          <h2 className="truncate text-xs font-semibold uppercase tracking-normal text-[var(--color-text)]">
+            <span className="pixel-dot mr-1.5 text-[var(--color-accent)] align-middle" />
             {t("hostOverview")}
           </h2>
-          <div className="truncate font-mono text-[11px] text-[var(--color-text-muted)]">
+          <div className="truncate text-[10px] uppercase text-[var(--color-text-muted)]">
             {t("hostsConfigured", { count: hosts.length })} · {isSubscribing ? t("connecting") : t("streamingMetrics")}
           </div>
         </div>
-        <div className="hidden shrink-0 grid-cols-4 gap-2 font-mono text-[11px] text-[var(--color-text-muted)] xl:grid">
+        <div className="hidden shrink-0 grid-cols-4 gap-2 text-[10px] uppercase text-[var(--color-text-muted)] xl:grid">
           <span>{t("cpu")}</span>
           <span>{t("memory")}</span>
           <span>{t("worstDisk")}</span>
@@ -209,25 +219,25 @@ export function OverviewPage({
                   }
                 }}
                 className={clsx(
-                  "grid min-h-20 min-w-0 cursor-default grid-cols-[220px_88px_repeat(4,minmax(96px,1fr))_112px] items-center gap-3 rounded-[var(--radius-control)] border bg-[var(--color-input)] p-2.5 font-mono text-xs outline-none transition-colors",
-                  "border-[var(--color-border-subtle)] hover:border-[var(--color-border-strong)] hover:bg-[var(--color-row-hover)] focus:border-[var(--color-accent)] focus:shadow-[var(--shadow-glow)]",
+                  "pixel-card grid min-h-20 min-w-0 cursor-default grid-cols-[220px_88px_repeat(4,minmax(96px,1fr))_112px] items-center gap-3 p-2 text-[11px] outline-none transition-colors",
+                  "hover:border-[var(--color-border-strong)] hover:bg-[var(--color-row-hover)] focus:border-[var(--color-accent)] focus:shadow-[inset_3px_0_0_var(--color-accent),var(--shadow-glow)]",
                 )}
               >
                 <div className="min-w-0">
                   <div className="flex min-w-0 items-center gap-2">
-                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: healthTone }} />
-                    <span className="min-w-0 truncate text-sm font-semibold text-[var(--color-text)]">{host.name}</span>
+                    <span className="h-2 w-2 shrink-0 rounded-[1px]" style={{ backgroundColor: healthTone, boxShadow: `0 0 8px ${healthTone}` }} />
+                    <span className="min-w-0 truncate text-xs font-semibold uppercase text-[var(--color-text)]">{host.name}</span>
                   </div>
-                  <div className="mt-1 truncate text-[11px] text-[var(--color-text-muted)]">
+                  <div className="mt-1 truncate text-[10px] text-[var(--color-text-muted)]">
                     {host.auth.username}@{host.address}:{host.port}
                   </div>
-                  <div className="mt-1 truncate text-[11px] text-[var(--color-text-muted)]">
+                  <div className="mt-1 truncate text-[10px] text-[var(--color-text-muted)]">
                     {snapshot?.system.hostname ?? error?.message ?? t("waitingForMetrics")}
                   </div>
                 </div>
 
                 <div className="min-w-0">
-                  <div className="mb-1 text-[10px] uppercase text-[var(--color-text-muted)]">{t("status")}</div>
+                  <div className="mb-1 text-[9px] uppercase text-[var(--color-text-muted)]">{t("status")}</div>
                   <HostConnectionBadge state={connection} />
                 </div>
 

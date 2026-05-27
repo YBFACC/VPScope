@@ -55,7 +55,7 @@ export function MetricPanel({
   return (
     <section
       className={clsx(
-        "metric-panel-shell grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-[var(--radius-panel)] border border-[var(--color-border)] p-3 shadow-[var(--shadow-panel)]",
+        "metric-panel-shell grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-[var(--radius-panel)] border border-[var(--color-border)] p-3 font-mono shadow-[var(--shadow-panel)]",
         className,
       )}
       data-collapsed={isCollapsed}
@@ -73,7 +73,7 @@ export function MetricPanel({
             className="metric-panel-title-button min-w-0 font-mono text-[11px] font-semibold uppercase tracking-normal text-[var(--color-text)]"
           >
             <span
-              className="mr-1 inline-block h-1.5 w-1.5 rounded-full align-middle"
+              className="pixel-dot mr-1.5 align-middle"
               style={{ backgroundColor: accent, boxShadow: `0 0 14px ${accent}` }}
             />
             <span className="truncate">{title}</span>
@@ -81,7 +81,7 @@ export function MetricPanel({
         ) : (
           <h2 className="min-w-0 font-mono text-[11px] font-semibold uppercase tracking-normal text-[var(--color-text)]">
             <span
-              className="mr-1 inline-block h-1.5 w-1.5 rounded-full align-middle"
+              className="pixel-dot mr-1.5 align-middle"
               style={{ backgroundColor: accent, boxShadow: `0 0 14px ${accent}` }}
             />
             {title}

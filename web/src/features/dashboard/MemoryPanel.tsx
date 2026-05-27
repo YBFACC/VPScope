@@ -20,8 +20,8 @@ export function MemoryPanel({ snapshot, history }: MemoryPanelProps) {
 
   return (
     <MetricPanel panelId="memory" title={t("memory")} accent="var(--color-memory)" status={formatPercent(usedPercent)}>
-      <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-3">
-        <div className="grid min-h-0 grid-cols-[94px_minmax(0,1fr)] gap-3">
+      <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-2">
+        <div className="grid min-h-0 grid-cols-[94px_minmax(0,1fr)] gap-2">
           <UsageRing
             value={usedPercent}
             label={t("memory")}
@@ -29,28 +29,28 @@ export function MemoryPanel({ snapshot, history }: MemoryPanelProps) {
             color="var(--color-memory)"
             size={92}
           />
-          <div className="grid min-h-0 grid-rows-[auto_48px] gap-2">
-            <div className="grid grid-cols-3 gap-2 font-mono text-[11px]">
-              <div className="rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] px-2 py-1">
-                <div className="text-[var(--color-text-muted)]">{t("used")}</div>
+          <div className="grid min-h-0 grid-rows-[auto_48px] gap-1.5">
+            <div className="grid grid-cols-3 gap-1.5 font-mono text-[10px]">
+              <div className="pixel-card px-2 py-1">
+                <div className="uppercase text-[var(--color-text-muted)]">{t("used")}</div>
                 <div className="mt-0.5 truncate text-xs text-[var(--color-memory)] tabular-nums">
                   {formatBytes(snapshot.memory.usedBytes)}
                 </div>
               </div>
-              <div className="rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] px-2 py-1">
-                <div className="text-[var(--color-text-muted)]">{t("available")}</div>
+              <div className="pixel-card px-2 py-1">
+                <div className="uppercase text-[var(--color-text-muted)]">{t("available")}</div>
                 <div className="mt-0.5 truncate text-xs text-[var(--color-cpu)] tabular-nums">
                   {formatBytes(snapshot.memory.availableBytes)}
                 </div>
               </div>
-              <div className="rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] px-2 py-1">
-                <div className="text-[var(--color-text-muted)]">{t("cache")}</div>
+              <div className="pixel-card px-2 py-1">
+                <div className="uppercase text-[var(--color-text-muted)]">{t("cache")}</div>
                 <div className="mt-0.5 truncate text-xs text-[var(--color-text)] tabular-nums">
                   {formatBytes(snapshot.memory.cachedBytes)}
                 </div>
               </div>
             </div>
-            <div className="min-h-0 rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] p-2">
+            <div className="pixel-card min-h-0 p-1.5">
               <Sparkline
                 values={history.map((point) => point.value)}
                 color="var(--color-memory)"
@@ -61,7 +61,7 @@ export function MemoryPanel({ snapshot, history }: MemoryPanelProps) {
             </div>
           </div>
         </div>
-        <div className="grid content-start gap-1.5">
+        <div className="grid content-start gap-1">
           <SegmentedMeter label={t("mem")} value={usedPercent} color="var(--color-memory)" segments={20} />
           <SegmentedMeter label={t("swap")} value={swapPercent} color="var(--color-warning)" segments={20} />
         </div>

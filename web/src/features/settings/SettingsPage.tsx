@@ -185,17 +185,17 @@ export function SettingsPage() {
   };
 
   return (
-    <div className="fixed inset-0 z-30 grid place-items-center bg-[var(--color-overlay)] p-4 backdrop-blur-sm">
-      <section className="grid h-[min(620px,calc(100vh-2rem))] w-full max-w-3xl grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-[var(--radius-panel)] border border-[var(--color-border-strong)] bg-[var(--color-panel-glass)] shadow-[var(--shadow-panel)] backdrop-blur">
-        <div className="flex items-center justify-between gap-3 bg-[var(--color-panel-raised)]">
-          <h2 className="px-4 py-3 font-mono text-base font-semibold text-[var(--color-text)]">
-            <span className="mr-2 inline-block h-2 w-2 rounded-full bg-[var(--color-accent)] shadow-[var(--shadow-glow)]" />
+    <div className="fixed inset-0 z-30 grid place-items-center bg-[var(--color-overlay)] p-4">
+      <section className="grid h-[min(620px,calc(100vh-2rem))] w-full max-w-3xl grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-[var(--radius-panel)] border border-[var(--color-border-strong)] bg-[var(--color-panel-glass)] font-mono shadow-[var(--shadow-panel)]">
+        <div className="flex items-center justify-between gap-3 border-b border-[var(--color-border)] bg-[var(--color-panel-raised)]">
+          <h2 className="px-4 py-3 text-sm font-semibold uppercase text-[var(--color-text)]">
+            <span className="pixel-dot mr-2 text-[var(--color-accent)]" />
             {t("settings")}
           </h2>
           <button
             type="button"
             onClick={() => setSettingsOpen(false)}
-            className="mr-3 grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] text-[var(--color-text-muted)] hover:border-[var(--color-border-strong)] hover:bg-[var(--color-row-hover)] hover:text-[var(--color-text)]"
+            className="mr-3 grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-input)] text-[var(--color-text-muted)] hover:border-[var(--color-border-strong)] hover:bg-[var(--color-row-hover)] hover:text-[var(--color-accent)]"
             title={t("close")}
             aria-label={t("close")}
           >
@@ -212,14 +212,14 @@ export function SettingsPage() {
             </svg>
           </button>
         </div>
-        <div className="grid min-h-0 border-t border-[var(--color-border)] md:grid-cols-[180px_minmax(0,1fr)]">
+        <div className="grid min-h-0 md:grid-cols-[180px_minmax(0,1fr)]">
           <nav className="flex gap-1 border-b border-[var(--color-border)] bg-[var(--color-panel-muted)] p-2 md:flex-col md:items-stretch md:border-b-0 md:border-r">
             {(["appearance", "menuBar", "alerts", "terminal"] as const).map((candidate) => (
               <button
                 key={candidate}
                 type="button"
                 onClick={() => setSection(candidate)}
-                className="h-9 shrink-0 rounded-[var(--radius-control)] border border-transparent px-3 text-left font-mono text-xs text-[var(--color-text-muted)] hover:bg-[var(--color-row-hover)] data-[active=true]:border-[var(--color-border-subtle)] data-[active=true]:bg-[var(--color-input)] data-[active=true]:text-[var(--color-text)]"
+                className="h-9 shrink-0 rounded-[var(--radius-control)] border border-transparent px-3 text-left text-[11px] uppercase text-[var(--color-text-muted)] hover:bg-[var(--color-row-hover)] hover:text-[var(--color-accent)] data-[active=true]:border-[var(--color-border-strong)] data-[active=true]:bg-[var(--color-input)] data-[active=true]:text-[var(--color-accent)]"
                 data-active={candidate === section}
               >
                 {candidate === "appearance"
@@ -243,7 +243,7 @@ export function SettingsPage() {
                         key={theme.id}
                         type="button"
                         onClick={() => setTheme(theme.id as ThemeId)}
-                        className="grid min-h-16 content-between rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] p-3 text-left text-[var(--color-text-muted)] hover:border-[var(--color-border-strong)] hover:bg-[var(--color-row-hover)] data-[active=true]:border-[var(--color-accent)] data-[active=true]:text-[var(--color-text)] data-[active=true]:shadow-[var(--shadow-glow)]"
+                        className="pixel-card grid min-h-16 content-between p-3 text-left text-[var(--color-text-muted)] hover:border-[var(--color-border-strong)] hover:bg-[var(--color-row-hover)] data-[active=true]:border-[var(--color-accent)] data-[active=true]:text-[var(--color-accent)] data-[active=true]:shadow-[var(--shadow-glow)]"
                         data-active={theme.id === themeId}
                       >
                         <span>{theme.name}</span>
@@ -251,7 +251,7 @@ export function SettingsPage() {
                           {theme.chart.barSteps.slice(1, 5).map((color) => (
                             <span
                               key={color}
-                              className="h-1.5 flex-1 rounded-full"
+                              className="h-2 flex-1"
                               style={{ backgroundColor: color }}
                             />
                           ))}
@@ -262,13 +262,13 @@ export function SettingsPage() {
                 </SettingsGroup>
 
                 <SettingsGroup title={t("language")}>
-                  <div className="inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] p-1">
+                  <div className="inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-input)] p-1">
                     {(Object.keys(localeNames) as Locale[]).map((candidate) => (
                       <button
                         key={candidate}
                         type="button"
                         onClick={() => setLocale(candidate)}
-                        className="h-8 rounded-[var(--radius-control)] px-3 font-mono text-xs text-[var(--color-text-muted)] hover:bg-[var(--color-row-hover)] data-[active=true]:bg-[var(--color-panel-muted)] data-[active=true]:text-[var(--color-text)]"
+                        className="h-8 rounded-[var(--radius-control)] border border-transparent px-3 text-[11px] uppercase text-[var(--color-text-muted)] hover:bg-[var(--color-row-hover)] data-[active=true]:border-[var(--color-border-strong)] data-[active=true]:bg-[var(--color-panel-muted)] data-[active=true]:text-[var(--color-accent)]"
                         data-active={candidate === locale}
                       >
                         {localeNames[candidate]}
@@ -294,7 +294,7 @@ export function SettingsPage() {
                       return (
                         <section
                           key={host.id}
-                          className="grid gap-2 rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] p-3 sm:grid-cols-[minmax(0,1fr)_112px_144px] sm:items-center"
+                          className="pixel-card grid gap-2 p-3 sm:grid-cols-[minmax(0,1fr)_112px_144px] sm:items-center"
                         >
                           <label className="flex min-w-0 items-start gap-2">
                             <input
@@ -316,18 +316,18 @@ export function SettingsPage() {
                             disabled={!enabled}
                             maxLength={12}
                             onChange={(event) => setTrayLabel(host, event.currentTarget.value)}
-                            className="h-8 min-w-0 rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-panel)] px-2 text-[var(--color-text)] outline-none focus:border-[var(--color-border-strong)] disabled:text-[var(--color-text-muted)]"
+                            className="h-8 min-w-0 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-panel)] px-2 text-[var(--color-text)] outline-none focus:border-[var(--color-border-strong)] disabled:text-[var(--color-text-muted)]"
                             aria-label={t("menuBarName")}
                           />
 
-                          <div className="flex items-center gap-1 rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-panel)] p-1">
+                          <div className="flex items-center gap-1 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-panel)] p-1">
                             {(["text", "rings"] as const).map((mode) => (
                               <button
                                 key={mode}
                                 type="button"
                                 disabled={!enabled}
                                 onClick={() => setTrayDisplayMode(host, mode)}
-                                className="h-6 flex-1 rounded-[var(--radius-control)] px-2 text-[11px] text-[var(--color-text-muted)] disabled:opacity-40 data-[active=true]:bg-[var(--color-panel-muted)] data-[active=true]:text-[var(--color-text)]"
+                                className="h-6 flex-1 rounded-[var(--radius-control)] border border-transparent px-2 text-[10px] uppercase text-[var(--color-text-muted)] disabled:opacity-40 data-[active=true]:border-[var(--color-border-strong)] data-[active=true]:bg-[var(--color-panel-muted)] data-[active=true]:text-[var(--color-accent)]"
                                 data-active={displayMode === mode}
                               >
                                 {mode === "text" ? t("textMode") : t("ringsMode")}
@@ -351,14 +351,14 @@ export function SettingsPage() {
               </div>
             ) : section === "alerts" ? (
               <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-3 font-mono text-xs">
-                <div className="grid gap-2 rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                <div className="pixel-card grid gap-2 p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
                   <div className="min-w-0">
                     <div className="text-[var(--color-text)]">{t("alertNotifications")}</div>
                     <div className="mt-1 text-[var(--color-text-muted)]">
                       {t("alertSettingsHint")}
                     </div>
-                    <div className="mt-2 inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-panel)] px-2 py-1 text-[11px] text-[var(--color-text-muted)]">
-                      <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: alertPermission === "granted" ? "var(--color-cpu)" : "var(--color-warning)" }} />
+                    <div className="mt-2 inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-panel)] px-2 py-1 text-[11px] text-[var(--color-text-muted)]">
+                      <span className="h-1.5 w-1.5 rounded-[1px]" style={{ backgroundColor: alertPermission === "granted" ? "var(--color-cpu)" : "var(--color-warning)" }} />
                       {t("notificationPermission")}: {t(alertPermission === "granted" ? "permissionGranted" : alertPermission === "denied" ? "permissionDenied" : "permissionPrompt")}
                     </div>
                   </div>
@@ -383,7 +383,7 @@ export function SettingsPage() {
                       return (
                         <section
                           key={host.id}
-                          className="grid gap-2 rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] p-3 sm:grid-cols-[minmax(0,1fr)_120px_124px] sm:items-center"
+                          className="pixel-card grid gap-2 p-3 sm:grid-cols-[minmax(0,1fr)_120px_124px] sm:items-center"
                         >
                           <label className="flex min-w-0 items-start gap-2">
                             <input
@@ -402,7 +402,7 @@ export function SettingsPage() {
 
                           <label className="grid gap-1">
                             <span className="text-[10px] uppercase text-[var(--color-text-muted)]">{t("threshold")}</span>
-                            <div className="flex h-8 items-center rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-panel)] px-2">
+                            <div className="flex h-8 items-center rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-panel)] px-2">
                               <input
                                 value={Math.round(rule.thresholdPercent)}
                                 disabled={!enabled}
@@ -423,7 +423,7 @@ export function SettingsPage() {
                               value={rule.cooldownMs}
                               disabled={!enabled}
                               onChange={(event) => setAlertCooldown(host, Number(event.currentTarget.value))}
-                              className="h-8 rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-panel)] px-2 text-[var(--color-text)] outline-none focus:border-[var(--color-border-strong)] disabled:text-[var(--color-text-muted)]"
+                              className="h-8 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-panel)] px-2 text-[var(--color-text)] outline-none focus:border-[var(--color-border-strong)] disabled:text-[var(--color-text-muted)]"
                               aria-label={t("cooldown")}
                             >
                               {alertCooldownOptions.map((cooldownMs) => (
@@ -454,13 +454,13 @@ export function SettingsPage() {
 
                 <div className="grid content-start gap-2">
                   <SettingsGroup title={t("terminalApp")}>
-                    <div className="grid w-full max-w-md grid-cols-2 gap-1 rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] p-1 sm:grid-cols-3">
+                    <div className="grid w-full max-w-md grid-cols-2 gap-1 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-input)] p-1 sm:grid-cols-3">
                       {terminalAppOptions.map((app) => (
                         <button
                           key={app}
                           type="button"
                           onClick={() => setTerminalApp(app)}
-                          className="h-8 flex-1 rounded-[var(--radius-control)] px-3 font-mono text-xs text-[var(--color-text-muted)] hover:bg-[var(--color-row-hover)] data-[active=true]:bg-[var(--color-panel-muted)] data-[active=true]:text-[var(--color-text)]"
+                          className="h-8 flex-1 rounded-[var(--radius-control)] border border-transparent px-3 text-[11px] uppercase text-[var(--color-text-muted)] hover:bg-[var(--color-row-hover)] data-[active=true]:border-[var(--color-border-strong)] data-[active=true]:bg-[var(--color-panel-muted)] data-[active=true]:text-[var(--color-accent)]"
                           data-active={terminalDraft.app === app}
                         >
                           {t(terminalAppLabel(app))}
@@ -495,7 +495,7 @@ export function SettingsPage() {
 function SettingsGroup({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="grid gap-2">
-      <h3 className="text-[11px] uppercase text-[var(--color-text-muted)]">{title}</h3>
+      <h3 className="text-[10px] uppercase text-[var(--color-text-muted)]">{title}</h3>
       {children}
     </section>
   );
@@ -503,7 +503,7 @@ function SettingsGroup({ title, children }: { title: string; children: React.Rea
 
 function InfoBlock({ title, text, muted = false }: { title: string; text: string; muted?: boolean }) {
   return (
-    <section className="rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] p-3">
+    <section className="pixel-card p-3">
       <div className="text-[var(--color-text-muted)]">{title}</div>
       <div className={muted ? "mt-1 text-[var(--color-text-muted)]" : "mt-1 text-[var(--color-text)]"}>{text}</div>
     </section>

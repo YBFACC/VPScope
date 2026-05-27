@@ -195,6 +195,8 @@ export type AlertSettings = {
 };
 ```
 
+`disks` 表示适合监控展示的文件系统挂载，不是 `df -P` 的原始全量输出。后端应过滤 `tmpfs`、`devtmpfs`、`efivarfs`、`proc`、`sysfs`、`cgroup*`、`overlay` 等虚拟或运行时文件系统，以及 `/proc`、`/sys`、`/run`、`/dev` 下的运行时挂载。
+
 ## Tauri Commands
 
 ### `host_list`
