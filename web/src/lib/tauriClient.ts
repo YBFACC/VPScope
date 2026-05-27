@@ -63,6 +63,10 @@ export type VPScopeClient = {
   sendNativeNotification(payload: NotificationPayload): Promise<void>;
 };
 
+export type ClientMode = "mock" | "tauri";
+
+const clientModeStorageKey = "vpscope-client-mode";
+
 function toAppError(error: unknown): AppError {
   if (typeof error === "object" && error !== null && "code" in error && "message" in error) {
     return error as AppError;
@@ -186,7 +190,34 @@ function isTauriRuntime() {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in (window as unknown as Record<string, unknown>);
 }
 
-const clientMode = import.meta.env.VITE_VPSCOPE_CLIENT === "tauri" || isTauriRuntime() ? "tauri" : "mock";
+function readStoredClientMode(): ClientMode | undefined {
+  if (typeof window === "undefined") {
+    return undefined;
+  }
+
+  const storedValue = window.localStorage.getItem(clientModeStorageKey);
+  return storedValue === "mock" || storedValue === "tauri" ? storedValue : undefined;
+}
+
+function readEnvClientMode(): ClientMode | undefined {
+  return import.meta.env.VITE_VPSCOPE_CLIENT === "mock" || import.meta.env.VITE_VPSCOPE_CLIENT === "tauri"
+    ? import.meta.env.VITE_VPSCOPE_CLIENT
+    : undefined;
+}
+
+export function resolveClientMode(): ClientMode {
+  return readStoredClientMode() ?? readEnvClientMode() ?? (isTauriRuntime() ? "tauri" : "mock");
+}
+
+export function persistClientMode(mode: ClientMode) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(clientModeStorageKey, mode);
+}
+
+export const clientMode = resolveClientMode();
 
 export const tauriClient: VPScopeClient = clientMode === "tauri" ? createTauriClient() : createMockTauriClient();
 

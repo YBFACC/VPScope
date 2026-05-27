@@ -4,6 +4,15 @@ VPScope 是一个面向 macOS 的 VPS 监控桌面应用，目标是提供接近
 
 项目使用 `Tauri v2 + Rust + React + TypeScript + Tailwind CSS` 构建，MVP 采用 agentless SSH 方案：不在服务器安装 agent，通过 SSH 读取系统指标并在本地桌面中展示。
 
+## Screenshots
+
+![VPScope dashboard](./docs/images/image1.png)
+
+<p align="center">
+  <img src="./docs/images/image2.png" alt="VPScope overview" width="49%" />
+  <img src="./docs/images/image3.png" alt="VPScope host details" width="49%" />
+</p>
+
 ## Why VPScope
 
 - 面向运维和开发者的高密度监控 UI，不是营销型 dashboard

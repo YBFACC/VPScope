@@ -1,10 +1,13 @@
+import { useState } from "react";
 import { useI18n } from "@/i18n/useI18n";
 import { formatDateTime } from "@/lib/format";
+import { clientMode, persistClientMode, type ClientMode } from "@/lib/tauriClient";
 import { useHostStore, useSelectedHost } from "@/stores/hostStore";
 import { useMetricsStore } from "@/stores/metricsStore";
 import { useUiStore } from "@/stores/uiStore";
 
 export function TopToolbar() {
+  const [mode, setMode] = useState<ClientMode>(clientMode);
   const host = useSelectedHost();
   const hosts = useHostStore((state) => state.hosts);
   const snapshots = useMetricsStore((state) => state.snapshots);
@@ -15,6 +18,13 @@ export function TopToolbar() {
   const setSettingsOpen = useUiStore((state) => state.setSettingsOpen);
   const { t } = useI18n();
   const displayTs = viewMode === "overview" ? latestSnapshotTs : snapshot?.ts;
+
+  function toggleClientMode() {
+    const nextMode: ClientMode = mode === "mock" ? "tauri" : "mock";
+    persistClientMode(nextMode);
+    setMode(nextMode);
+    window.location.reload();
+  }
 
   return (
     <header className="grid gap-2 overflow-hidden rounded-[var(--radius-panel)] border border-[var(--color-border)] bg-[var(--color-panel-glass)] p-2 font-mono shadow-[var(--shadow-panel)] lg:grid-cols-[minmax(260px,1fr)_auto]">
@@ -36,6 +46,14 @@ export function TopToolbar() {
         </p>
       </div>
       <div className="flex min-w-0 items-center justify-end gap-1.5">
+        <button
+          type="button"
+          onClick={toggleClientMode}
+          className="h-8 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-input)] px-2 text-[10px] uppercase text-[var(--color-text-muted)] shadow-[inset_0_0_0_1px_var(--color-border-subtle)] hover:border-[var(--color-border-strong)] hover:text-[var(--color-accent)]"
+          title={mode === "mock" ? t("switchToLiveData") : t("switchToDemoData")}
+        >
+          {mode === "mock" ? t("demoMode") : t("liveMode")}
+        </button>
         <div className="flex items-center gap-1 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-input)] p-1 shadow-[inset_0_0_0_1px_var(--color-border-subtle)]">
           {(["overview", "list"] as const).map((candidate) => (
             <button
