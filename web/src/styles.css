@@ -382,6 +382,10 @@ input::placeholder {
   grid-template-rows: auto;
 }
 
+.metric-panel-shell[data-active="true"] {
+  border-color: var(--color-border-strong);
+}
+
 .metric-panel-header {
   position: relative;
   min-height: 1.55rem;
@@ -454,6 +458,16 @@ input::placeholder {
 
 .pixel-card:hover {
   border-color: var(--color-border);
+}
+
+.pixel-card[data-active="true"] {
+  border-color: var(--color-border-strong);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-accent) 10%, transparent), transparent),
+    var(--color-row-hover);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--color-border-strong) 26%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--color-accent) 8%, transparent);
 }
 
 .pixel-dot {

@@ -10,11 +10,15 @@ import type {
   ProcessInfo,
 } from "@/types/contracts";
 
+export type NetworkInterfaceHistory = {
+  rx: Array<HistoryPoint<number>>;
+  tx: Array<HistoryPoint<number>>;
+};
+
 type MetricHistory = {
   cpu: Array<HistoryPoint<number>>;
   memory: Array<HistoryPoint<number>>;
-  rx: Array<HistoryPoint<number>>;
-  tx: Array<HistoryPoint<number>>;
+  networkByInterface: Record<string, NetworkInterfaceHistory>;
 };
 
 type MetricsStore = {
@@ -44,21 +48,39 @@ const EMPTY_PROCESSES: ProcessInfo[] = [];
 const emptyHistory = (): MetricHistory => ({
   cpu: [],
   memory: [],
-  rx: [],
-  tx: [],
+  networkByInterface: {},
 });
 
 function nextHistory(previous: MetricHistory | undefined, snapshot: HostSnapshot) {
   const history = previous ?? emptyHistory();
   const memoryPercent =
     snapshot.memory.totalBytes > 0 ? (snapshot.memory.usedBytes / snapshot.memory.totalBytes) * 100 : 0;
-  const network = snapshot.network[0];
+  const nextNetworkByInterface = Object.fromEntries(
+    snapshot.network.map((iface) => {
+      const previousInterfaceHistory = history.networkByInterface[iface.iface];
+
+      return [
+        iface.iface,
+        {
+          rx: pushHistory(
+            previousInterfaceHistory?.rx ?? [],
+            { ts: snapshot.ts, value: iface.rxBytesPerSec },
+            HISTORY_LIMIT,
+          ),
+          tx: pushHistory(
+            previousInterfaceHistory?.tx ?? [],
+            { ts: snapshot.ts, value: iface.txBytesPerSec },
+            HISTORY_LIMIT,
+          ),
+        },
+      ] satisfies [string, NetworkInterfaceHistory];
+    }),
+  );
 
   return {
     cpu: pushHistory(history.cpu, { ts: snapshot.ts, value: snapshot.cpu.totalPercent }, HISTORY_LIMIT),
     memory: pushHistory(history.memory, { ts: snapshot.ts, value: memoryPercent }, HISTORY_LIMIT),
-    rx: pushHistory(history.rx, { ts: snapshot.ts, value: network?.rxBytesPerSec ?? 0 }, HISTORY_LIMIT),
-    tx: pushHistory(history.tx, { ts: snapshot.ts, value: network?.txBytesPerSec ?? 0 }, HISTORY_LIMIT),
+    networkByInterface: nextNetworkByInterface,
   };
 }
 

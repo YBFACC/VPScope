@@ -61,9 +61,12 @@ export function DashboardPage() {
   const setProcessSort = useUiStore((state) => state.setProcessSort);
   const collapsedPanels = useUiStore((state) => state.collapsedPanels);
   const panelOrder = useUiStore((state) => state.panelOrder);
+  const activeDashboardPanelId = useUiStore((state) => state.activeDashboardPanelId);
   const togglePanelCollapsed = useUiStore((state) => state.togglePanelCollapsed);
   const showAllPanels = useUiStore((state) => state.showAllPanels);
   const resetPanelOrder = useUiStore((state) => state.resetPanelOrder);
+  const selectNextNetworkInterface = useUiStore((state) => state.selectNextNetworkInterface);
+  const selectPrevNetworkInterface = useUiStore((state) => state.selectPrevNetworkInterface);
   const { t } = useI18n();
   const isOverview = viewMode === "overview";
 
@@ -197,6 +200,22 @@ export function DashboardPage() {
         moveFocusedProcess(-1, processes.length);
       }
 
+      if (event.key === "ArrowLeft" && activeDashboardPanelId === "network" && selectedHostId && snapshot?.network.length) {
+        event.preventDefault();
+        selectPrevNetworkInterface(
+          selectedHostId,
+          snapshot.network.map((iface) => iface.iface),
+        );
+      }
+
+      if (event.key === "ArrowRight" && activeDashboardPanelId === "network" && selectedHostId && snapshot?.network.length) {
+        event.preventDefault();
+        selectNextNetworkInterface(
+          selectedHostId,
+          snapshot.network.map((iface) => iface.iface),
+        );
+      }
+
       if (event.key === "Escape") {
         setSearch("");
       }
@@ -208,7 +227,17 @@ export function DashboardPage() {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [moveFocusedProcess, processes.length, setProcessSort, setSearch]);
+  }, [
+    activeDashboardPanelId,
+    moveFocusedProcess,
+    processes.length,
+    selectNextNetworkInterface,
+    selectPrevNetworkInterface,
+    selectedHostId,
+    setProcessSort,
+    setSearch,
+    snapshot,
+  ]);
 
   return (
     <main className="cockpit-surface h-screen overflow-hidden bg-[var(--color-bg)] p-2 text-[var(--color-text)] lg:p-3">
@@ -347,7 +376,7 @@ function DashboardPanels({
       accent: "var(--color-network-rx)",
       summary: t("ifaces", { count: snapshot.network.length }),
       column: "right",
-      element: <NetworkPanel snapshot={snapshot} rxHistory={history?.rx ?? []} txHistory={history?.tx ?? []} />,
+      element: <NetworkPanel snapshot={snapshot} networkByInterface={history?.networkByInterface ?? {}} />,
     },
     {
       id: "disk",

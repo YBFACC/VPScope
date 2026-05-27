@@ -2,7 +2,7 @@ import { create } from "zustand";
 import type { Locale } from "@/i18n/messages";
 import { applyTheme } from "@/theme/applyTheme";
 import { getThemeById, type ThemeId } from "@/theme/presets";
-import type { ProcessListPayload } from "@/types/contracts";
+import type { HostId, ProcessListPayload } from "@/types/contracts";
 
 export const dashboardPanelIds = ["cpu", "memory", "network", "disk", "process"] as const;
 
@@ -10,6 +10,7 @@ export type DashboardPanelId = (typeof dashboardPanelIds)[number];
 
 const collapsedPanelsStorageKey = "vpscope-collapsed-panels";
 const panelOrderStorageKey = "vpscope-panel-order";
+const selectedNetworkInterfaceStorageKey = "vpscope-network-selected-ifaces";
 const dashboardPanelIdSet = new Set<DashboardPanelId>(dashboardPanelIds);
 
 type PanelMoveDirection = "up" | "down";
@@ -64,6 +65,37 @@ function writePanelOrder(panelOrder: DashboardPanelId[]) {
   localStorage.setItem(panelOrderStorageKey, JSON.stringify(panelOrder));
 }
 
+function readSelectedNetworkInterfaces() {
+  try {
+    const rawValue = localStorage.getItem(selectedNetworkInterfaceStorageKey);
+    const parsedValue: unknown = rawValue ? JSON.parse(rawValue) : {};
+
+    if (!parsedValue || typeof parsedValue !== "object") {
+      return {} as Record<HostId, string>;
+    }
+
+    return Object.fromEntries(
+      Object.entries(parsedValue).filter(
+        (entry): entry is [HostId, string] => typeof entry[0] === "string" && typeof entry[1] === "string" && entry[1].length > 0,
+      ),
+    );
+  } catch {
+    return {} as Record<HostId, string>;
+  }
+}
+
+function writeSelectedNetworkInterfaces(selectedNetworkInterfaces: Record<HostId, string>) {
+  localStorage.setItem(selectedNetworkInterfaceStorageKey, JSON.stringify(selectedNetworkInterfaces));
+}
+
+function networkInterfaceIndex(selectedInterface: string | undefined, interfaces: string[]) {
+  if (!selectedInterface || interfaces.length === 0) {
+    return -1;
+  }
+
+  return interfaces.indexOf(selectedInterface);
+}
+
 type UiStore = {
   themeId: ThemeId;
   locale: Locale;
@@ -75,6 +107,8 @@ type UiStore = {
   settingsOpen: boolean;
   collapsedPanels: DashboardPanelId[];
   panelOrder: DashboardPanelId[];
+  activeDashboardPanelId?: DashboardPanelId;
+  selectedNetworkInterfaces: Record<HostId, string>;
   setTheme: (themeId: ThemeId) => void;
   setLocale: (locale: Locale) => void;
   setViewMode: (viewMode: "overview" | "list") => void;
@@ -86,12 +120,17 @@ type UiStore = {
   showAllPanels: () => void;
   movePanel: (panelId: DashboardPanelId, direction: PanelMoveDirection) => void;
   resetPanelOrder: () => void;
+  setActiveDashboardPanel: (panelId?: DashboardPanelId) => void;
+  selectNetworkInterface: (hostId: HostId, iface: string) => void;
+  selectNextNetworkInterface: (hostId: HostId, interfaces: string[]) => void;
+  selectPrevNetworkInterface: (hostId: HostId, interfaces: string[]) => void;
 };
 
 const initialTheme = getThemeById(localStorage.getItem("vpscope-theme"));
 const initialLocale = (localStorage.getItem("vpscope-locale") === "en-US" ? "en-US" : "zh-CN") satisfies Locale;
 const initialCollapsedPanels = readCollapsedPanels();
 const initialPanelOrder = readPanelOrder();
+const initialSelectedNetworkInterfaces = readSelectedNetworkInterfaces();
 
 export const useUiStore = create<UiStore>((set, get) => ({
   themeId: initialTheme.id,
@@ -104,6 +143,8 @@ export const useUiStore = create<UiStore>((set, get) => ({
   settingsOpen: false,
   collapsedPanels: initialCollapsedPanels,
   panelOrder: initialPanelOrder,
+  activeDashboardPanelId: undefined,
+  selectedNetworkInterfaces: initialSelectedNetworkInterfaces,
   setTheme(themeId) {
     applyTheme(getThemeById(themeId));
     set({ themeId });
@@ -172,5 +213,50 @@ export const useUiStore = create<UiStore>((set, get) => ({
     const panelOrder = [...dashboardPanelIds];
     writePanelOrder(panelOrder);
     set({ panelOrder });
+  },
+  setActiveDashboardPanel(activeDashboardPanelId) {
+    set({ activeDashboardPanelId });
+  },
+  selectNetworkInterface(hostId, iface) {
+    set((state) => {
+      const selectedNetworkInterfaces = {
+        ...state.selectedNetworkInterfaces,
+        [hostId]: iface,
+      };
+      writeSelectedNetworkInterfaces(selectedNetworkInterfaces);
+      return { selectedNetworkInterfaces };
+    });
+  },
+  selectNextNetworkInterface(hostId, interfaces) {
+    if (interfaces.length === 0) {
+      return;
+    }
+
+    set((state) => {
+      const currentIndex = networkInterfaceIndex(state.selectedNetworkInterfaces[hostId], interfaces);
+      const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % interfaces.length : 0;
+      const selectedNetworkInterfaces = {
+        ...state.selectedNetworkInterfaces,
+        [hostId]: interfaces[nextIndex],
+      };
+      writeSelectedNetworkInterfaces(selectedNetworkInterfaces);
+      return { selectedNetworkInterfaces };
+    });
+  },
+  selectPrevNetworkInterface(hostId, interfaces) {
+    if (interfaces.length === 0) {
+      return;
+    }
+
+    set((state) => {
+      const currentIndex = networkInterfaceIndex(state.selectedNetworkInterfaces[hostId], interfaces);
+      const prevIndex = currentIndex >= 0 ? (currentIndex - 1 + interfaces.length) % interfaces.length : interfaces.length - 1;
+      const selectedNetworkInterfaces = {
+        ...state.selectedNetworkInterfaces,
+        [hostId]: interfaces[prevIndex],
+      };
+      writeSelectedNetworkInterfaces(selectedNetworkInterfaces);
+      return { selectedNetworkInterfaces };
+    });
   },
 }));

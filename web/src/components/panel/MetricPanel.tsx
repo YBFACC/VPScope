@@ -11,8 +11,10 @@ type MetricPanelProps = {
   actions?: ReactNode;
   className?: string;
   children: ReactNode;
+  active?: boolean;
   collapsed?: boolean;
   onToggleCollapsed?: (panelId: DashboardPanelId) => void;
+  onActivate?: () => void;
 };
 
 export function MetricPanel({
@@ -23,8 +25,10 @@ export function MetricPanel({
   actions,
   className,
   children,
+  active = false,
   collapsed,
   onToggleCollapsed,
+  onActivate,
 }: MetricPanelProps) {
   const { t } = useI18n();
   const collapsedPanels = useUiStore((state) => state.collapsedPanels);
@@ -59,6 +63,9 @@ export function MetricPanel({
         className,
       )}
       data-collapsed={isCollapsed}
+      data-active={active}
+      onMouseDown={onActivate}
+      onFocusCapture={onActivate}
       style={{ "--panel-accent": accent } as CSSProperties}
     >
       <div className="metric-panel-accent" />
