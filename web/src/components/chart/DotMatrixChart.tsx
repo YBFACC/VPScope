@@ -1,3 +1,5 @@
+import { PIXEL_DENSITY } from "@/components/pixelDensity";
+
 type DotMatrixChartProps = {
   values: number[];
   color?: string;
@@ -26,13 +28,13 @@ export function DotMatrixChart({
   color = "var(--color-accent)",
   max,
   rows = 14,
-  minColumns = 48,
-  maxColumns = 160,
+  minColumns = PIXEL_DENSITY.dotChart.minColumns,
+  maxColumns = PIXEL_DENSITY.dotChart.maxColumns,
   className,
   invert = false,
-  cellSize = 4,
-  dotSize = 2,
-  inactiveOpacity = 0.16,
+  cellSize = PIXEL_DENSITY.dotChart.cellSize,
+  dotSize = PIXEL_DENSITY.dotChart.dotSize,
+  inactiveOpacity = PIXEL_DENSITY.dotChart.inactiveOpacity,
   minActiveRows = 1,
 }: DotMatrixChartProps) {
   const columns = Math.min(maxColumns, Math.max(minColumns, values.length || minColumns));

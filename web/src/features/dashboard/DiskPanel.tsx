@@ -1,5 +1,6 @@
 import { TerminalMeter } from "@/components/meter/TerminalMeter";
 import { MetricPanel } from "@/components/panel/MetricPanel";
+import { PIXEL_DENSITY } from "@/components/pixelDensity";
 import { useI18n } from "@/i18n/useI18n";
 import { formatBytes, formatPercent, formatRate } from "@/lib/format";
 import type { HostSnapshot } from "@/types/contracts";
@@ -64,16 +65,16 @@ export function DiskPanel({ snapshot }: DiskPanelProps) {
                 <span className="truncate" title={disk.label}>{disk.label}</span>
                 <strong>{formatBytes(disk.totalBytes)}</strong>
               </div>
-              <TerminalMeter label="U" value={usedPercent} detail={formatBytes(disk.usedBytes)} color={disk.isSwap ? "var(--color-warning)" : "var(--color-disk)"} segments={24} />
-              <TerminalMeter label="F" value={freePercent} detail={formatBytes(freeBytes)} color="var(--color-cpu)" segments={24} />
+              <TerminalMeter label="U" value={usedPercent} detail={formatBytes(disk.usedBytes)} color={disk.isSwap ? "var(--color-warning)" : "var(--color-disk)"} />
+              <TerminalMeter label="F" value={freePercent} detail={formatBytes(freeBytes)} color="var(--color-cpu)" />
               <div className="btop-io-row">
                 <span>{disk.isSwap ? "IO" : t("read")}</span>
-                <TerminalMeter value={disk.isSwap ? 0 : ((disk.readBytesPerSec ?? 0) / maxIoRate) * 100} color="var(--color-accent)" segments={12} showPercent={false} />
+                <TerminalMeter value={disk.isSwap ? 0 : ((disk.readBytesPerSec ?? 0) / maxIoRate) * 100} color="var(--color-accent)" segments={PIXEL_DENSITY.meter.compactSegments} showPercent={false} />
                 <span>{disk.isSwap ? "--" : formatRate(disk.readBytesPerSec ?? 0)}</span>
               </div>
               <div className="btop-io-row">
                 <span>{disk.isSwap ? "" : t("write")}</span>
-                <TerminalMeter value={disk.isSwap ? 0 : ((disk.writeBytesPerSec ?? 0) / maxIoRate) * 100} color="var(--color-disk)" segments={12} showPercent={false} />
+                <TerminalMeter value={disk.isSwap ? 0 : ((disk.writeBytesPerSec ?? 0) / maxIoRate) * 100} color="var(--color-disk)" segments={PIXEL_DENSITY.meter.compactSegments} showPercent={false} />
                 <span>{disk.isSwap ? "" : formatRate(disk.writeBytesPerSec ?? 0)}</span>
               </div>
             </div>

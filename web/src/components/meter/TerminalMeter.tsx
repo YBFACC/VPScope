@@ -1,5 +1,6 @@
 import clsx from "clsx";
 import { formatPercent } from "@/lib/format";
+import { PIXEL_DENSITY } from "@/components/pixelDensity";
 
 type TerminalMeterProps = {
   label?: string;
@@ -16,7 +17,7 @@ export function TerminalMeter({
   value,
   detail,
   color = "var(--color-accent)",
-  segments = 28,
+  segments = PIXEL_DENSITY.meter.segments,
   showPercent = true,
   className,
 }: TerminalMeterProps) {
@@ -33,7 +34,7 @@ export function TerminalMeter({
             className="terminal-meter-cell"
             style={{
               backgroundColor: index < activeSegments ? color : "var(--color-bar-track)",
-              opacity: index < activeSegments ? 1 : 0.32,
+              opacity: index < activeSegments ? 0.94 : 0.26,
             }}
           />
         ))}

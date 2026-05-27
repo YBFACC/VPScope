@@ -1,6 +1,7 @@
 import { DotMatrixChart } from "@/components/chart/DotMatrixChart";
 import { TerminalMeter } from "@/components/meter/TerminalMeter";
 import { MetricPanel } from "@/components/panel/MetricPanel";
+import { PIXEL_DENSITY } from "@/components/pixelDensity";
 import { useI18n } from "@/i18n/useI18n";
 import { formatPercent } from "@/lib/format";
 import type { HostSnapshot } from "@/types/contracts";
@@ -32,11 +33,8 @@ export function CpuPanel({ snapshot, history }: CpuPanelProps) {
             color="var(--color-cpu)"
             max={100}
             rows={20}
-            minColumns={132}
-            maxColumns={220}
-            cellSize={4}
-            dotSize={2}
-            inactiveOpacity={0.1}
+            minColumns={PIXEL_DENSITY.cpuChart.minColumns}
+            maxColumns={PIXEL_DENSITY.cpuChart.maxColumns}
             minActiveRows={1}
           />
           <div className="btop-faint-label">{t("uptime")} {formatUptime(snapshot.system.uptimeSec)}</div>
@@ -46,9 +44,9 @@ export function CpuPanel({ snapshot, history }: CpuPanelProps) {
             <span>{snapshot.system.hostname}</span>
             <span>{Math.round(snapshot.cpu.totalPercent)}</span>
           </div>
-          <TerminalMeter label="CPU" value={snapshot.cpu.totalPercent} color="var(--color-cpu)" segments={18} />
+          <TerminalMeter label="CPU" value={snapshot.cpu.totalPercent} color="var(--color-cpu)" />
           {snapshot.cpu.cores.slice(0, 8).map((core) => (
-            <TerminalMeter key={core.id} label={core.id.toUpperCase()} value={core.percent} color="var(--color-cpu)" segments={18} />
+            <TerminalMeter key={core.id} label={core.id.toUpperCase()} value={core.percent} color="var(--color-cpu)" />
           ))}
           <div className="btop-load">
             LAV: {snapshot.system.loadAvg.map((load) => load.toFixed(2)).join(" ")}

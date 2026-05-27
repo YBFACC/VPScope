@@ -1,4 +1,5 @@
 import { formatPercent } from "@/lib/format";
+import { PIXEL_DENSITY } from "@/components/pixelDensity";
 
 type SegmentedMeterProps = {
   value: number;
@@ -17,7 +18,7 @@ export function SegmentedMeter({
   detail,
   color = "var(--color-accent)",
   thresholdGradient = true,
-  segments = 18,
+  segments = PIXEL_DENSITY.meter.segments,
   compact = false,
   showValue = true,
 }: SegmentedMeterProps) {
@@ -46,11 +47,11 @@ export function SegmentedMeter({
           return (
             <span
               key={index}
-              className="pixel-meter-block h-3 min-w-0 transition-colors duration-300"
+              className="pixel-meter-block h-2.5 min-w-0 transition-colors duration-300"
               style={{
                 backgroundColor: isActive ? stepColor : "var(--color-bar-track)",
-                boxShadow: isActive ? `0 0 6px ${stepColor}` : undefined,
-                opacity: isActive ? 1 : 0.52,
+                boxShadow: isActive ? `0 0 4px ${stepColor}` : undefined,
+                opacity: isActive ? 0.92 : 0.42,
               }}
             />
           );

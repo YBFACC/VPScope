@@ -1,4 +1,6 @@
+import type { CSSProperties } from "react";
 import { MetricPanel } from "@/components/panel/MetricPanel";
+import { PIXEL_DENSITY } from "@/components/pixelDensity";
 import { useI18n } from "@/i18n/useI18n";
 import { formatBytes, formatPercent } from "@/lib/format";
 import type { HostSnapshot } from "@/types/contracts";
@@ -16,9 +18,10 @@ type MemoryDotRowProps = {
 };
 
 function MemoryDotRow({ label, value, percent, color }: MemoryDotRowProps) {
-  const columns = 34;
-  const rows = 4;
+  const columns = PIXEL_DENSITY.memory.columns;
+  const rows = PIXEL_DENSITY.memory.rows;
   const activeColumns = percent > 0 ? Math.max(1, Math.ceil((Math.min(100, percent) / 100) * columns)) : 0;
+  const dotGridStyle = { "--memory-dot-columns": columns } as CSSProperties;
 
   return (
     <div className="btop-memory-stat">
@@ -26,7 +29,7 @@ function MemoryDotRow({ label, value, percent, color }: MemoryDotRowProps) {
         <span>{label}:</span>
         <strong>{value}</strong>
       </div>
-      <div className="btop-memory-dots">
+      <div className="btop-memory-dots" style={dotGridStyle}>
         {Array.from({ length: rows * columns }, (_, index) => {
           const column = index % columns;
 

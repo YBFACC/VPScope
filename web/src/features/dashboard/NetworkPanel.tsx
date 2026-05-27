@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { DotMatrixChart } from "@/components/chart/DotMatrixChart";
 import { MetricPanel } from "@/components/panel/MetricPanel";
+import { PIXEL_DENSITY } from "@/components/pixelDensity";
 import { useI18n } from "@/i18n/useI18n";
 import { formatBytes, formatRate } from "@/lib/format";
 import type { HistoryPoint } from "@/lib/historyBuffer";
@@ -161,21 +162,17 @@ export function NetworkPanel({ snapshot, networkByInterface }: NetworkPanelProps
                     values={rxValues}
                     max={maxRate}
                     rows={8}
-                    minColumns={68}
-                    maxColumns={120}
+                    minColumns={PIXEL_DENSITY.networkChart.minColumns}
+                    maxColumns={PIXEL_DENSITY.networkChart.maxColumns}
                     color="var(--color-network-rx)"
-                    cellSize={5}
-                    dotSize={2.5}
                   />
                   <DotMatrixChart
                     values={txValues}
                     max={maxRate}
                     rows={8}
-                    minColumns={68}
-                    maxColumns={120}
+                    minColumns={PIXEL_DENSITY.networkChart.minColumns}
+                    maxColumns={PIXEL_DENSITY.networkChart.maxColumns}
                     color="var(--color-network-tx)"
-                    cellSize={5}
-                    dotSize={2.5}
                     invert
                   />
                 </div>
