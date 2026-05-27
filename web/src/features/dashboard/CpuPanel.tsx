@@ -36,6 +36,7 @@ export function CpuPanel({ snapshot, history }: CpuPanelProps) {
             minColumns={PIXEL_DENSITY.cpuChart.minColumns}
             maxColumns={PIXEL_DENSITY.cpuChart.maxColumns}
             minActiveRows={1}
+            toneScale="cpu"
           />
           <div className="btop-faint-label">{t("uptime")} {formatUptime(snapshot.system.uptimeSec)}</div>
         </div>
@@ -44,9 +45,9 @@ export function CpuPanel({ snapshot, history }: CpuPanelProps) {
             <span>{snapshot.system.hostname}</span>
             <span>{Math.round(snapshot.cpu.totalPercent)}</span>
           </div>
-          <TerminalMeter label="CPU" value={snapshot.cpu.totalPercent} color="var(--color-cpu)" />
+          <TerminalMeter label="CPU" value={snapshot.cpu.totalPercent} color="var(--color-cpu)" toneScale="cpu" />
           {snapshot.cpu.cores.slice(0, 8).map((core) => (
-            <TerminalMeter key={core.id} label={core.id.toUpperCase()} value={core.percent} color="var(--color-cpu)" />
+            <TerminalMeter key={core.id} label={core.id.toUpperCase()} value={core.percent} color="var(--color-cpu)" toneScale="cpu" />
           ))}
           <div className="btop-load">
             LAV: {snapshot.system.loadAvg.map((load) => load.toFixed(2)).join(" ")}

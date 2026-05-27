@@ -1,4 +1,5 @@
 import { PIXEL_DENSITY } from "@/components/pixelDensity";
+import { getLoadToneColor, type LoadToneScale } from "@/lib/loadTone";
 
 type DotMatrixChartProps = {
   values: number[];
@@ -13,6 +14,7 @@ type DotMatrixChartProps = {
   dotSize?: number;
   inactiveOpacity?: number;
   minActiveRows?: number;
+  toneScale?: LoadToneScale;
 };
 
 function normalizeSeries(values: number[], columns: number) {
@@ -36,6 +38,7 @@ export function DotMatrixChart({
   dotSize = PIXEL_DENSITY.dotChart.dotSize,
   inactiveOpacity = PIXEL_DENSITY.dotChart.inactiveOpacity,
   minActiveRows = 1,
+  toneScale,
 }: DotMatrixChartProps) {
   const columns = Math.min(maxColumns, Math.max(minColumns, values.length || minColumns));
   const ceiling = max ?? Math.max(1, ...values);
@@ -61,6 +64,8 @@ export function DotMatrixChart({
         Array.from({ length: rows }, (_, rowIndex) => {
           const filled = invert ? rowIndex < activeRows : rows - rowIndex <= activeRows;
           const age = columnIndex / Math.max(1, columns - 1);
+          const loadLevel = invert ? ((rowIndex + 1) / rows) * 100 : ((rows - rowIndex) / rows) * 100;
+          const fillColor = toneScale ? getLoadToneColor(toneScale, loadLevel) : color;
 
           return (
             <rect
@@ -69,8 +74,8 @@ export function DotMatrixChart({
               y={rowIndex * cellSize}
               width={dotSize}
               height={dotSize}
-              fill={filled ? color : "var(--color-bar-track)"}
-              opacity={filled ? 0.42 + age * 0.58 : inactiveOpacity}
+              fill={filled ? fillColor : "var(--color-bar-track)"}
+              opacity={filled ? (toneScale ? 0.96 : 0.42 + age * 0.58) : inactiveOpacity}
             />
           );
         }),

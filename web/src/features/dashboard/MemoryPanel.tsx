@@ -3,6 +3,7 @@ import { MetricPanel } from "@/components/panel/MetricPanel";
 import { PIXEL_DENSITY } from "@/components/pixelDensity";
 import { useI18n } from "@/i18n/useI18n";
 import { formatBytes, formatPercent } from "@/lib/format";
+import { getLoadToneColor, type LoadToneScale } from "@/lib/loadTone";
 import type { HostSnapshot } from "@/types/contracts";
 
 type MemoryPanelProps = {
@@ -15,9 +16,10 @@ type MemoryDotRowProps = {
   value: string;
   percent: number;
   color: string;
+  toneScale?: LoadToneScale;
 };
 
-function MemoryDotRow({ label, value, percent, color }: MemoryDotRowProps) {
+function MemoryDotRow({ label, value, percent, color, toneScale }: MemoryDotRowProps) {
   const columns = PIXEL_DENSITY.memory.columns;
   const rows = PIXEL_DENSITY.memory.rows;
   const activeColumns = percent > 0 ? Math.max(1, Math.ceil((Math.min(100, percent) / 100) * columns)) : 0;
@@ -38,7 +40,11 @@ function MemoryDotRow({ label, value, percent, color }: MemoryDotRowProps) {
               key={index}
               className="btop-memory-dot"
               style={{
-                backgroundColor: column < activeColumns ? color : "var(--color-bar-track)",
+                backgroundColor: column < activeColumns
+                  ? toneScale
+                    ? getLoadToneColor(toneScale, ((column + 1) / columns) * 100)
+                    : color
+                  : "var(--color-bar-track)",
                 opacity: column < activeColumns ? 1 : 0.22,
               }}
             />
@@ -69,7 +75,7 @@ export function MemoryPanel({ snapshot }: MemoryPanelProps) {
             <span>{t("total")}:</span>
             <strong>{formatBytes(snapshot.memory.totalBytes)}</strong>
           </div>
-          <MemoryDotRow label={t("used")} value={formatBytes(snapshot.memory.usedBytes)} percent={usedPercent} color="var(--color-memory)" />
+          <MemoryDotRow label={t("used")} value={formatBytes(snapshot.memory.usedBytes)} percent={usedPercent} color="var(--color-memory)" toneScale="memory" />
           <MemoryDotRow label={t("available")} value={formatBytes(snapshot.memory.availableBytes)} percent={availablePercent} color="var(--color-warning)" />
           <MemoryDotRow label={t("cache")} value={formatBytes(snapshot.memory.cachedBytes)} percent={cachedPercent} color="var(--color-network-tx)" />
           <MemoryDotRow label={t("free")} value={formatBytes(freeBytes)} percent={freePercent} color="var(--color-cpu)" />

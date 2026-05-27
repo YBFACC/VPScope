@@ -1,5 +1,6 @@
 import clsx from "clsx";
 import { formatPercent } from "@/lib/format";
+import { getLoadToneColor, type LoadToneScale } from "@/lib/loadTone";
 import { PIXEL_DENSITY } from "@/components/pixelDensity";
 
 type TerminalMeterProps = {
@@ -10,6 +11,7 @@ type TerminalMeterProps = {
   segments?: number;
   showPercent?: boolean;
   className?: string;
+  toneScale?: LoadToneScale;
 };
 
 export function TerminalMeter({
@@ -20,6 +22,7 @@ export function TerminalMeter({
   segments = PIXEL_DENSITY.meter.segments,
   showPercent = true,
   className,
+  toneScale,
 }: TerminalMeterProps) {
   const clamped = Math.max(0, Math.min(100, value));
   const activeSegments = clamped > 0 ? Math.max(1, Math.round((clamped / 100) * segments)) : 0;
@@ -33,7 +36,11 @@ export function TerminalMeter({
             key={index}
             className="terminal-meter-cell"
             style={{
-              backgroundColor: index < activeSegments ? color : "var(--color-bar-track)",
+              backgroundColor: index < activeSegments
+                ? toneScale
+                  ? getLoadToneColor(toneScale, ((index + 1) / segments) * 100)
+                  : color
+                : "var(--color-bar-track)",
               opacity: index < activeSegments ? 0.94 : 0.26,
             }}
           />

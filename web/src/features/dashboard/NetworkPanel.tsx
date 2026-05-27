@@ -165,6 +165,7 @@ export function NetworkPanel({ snapshot, networkByInterface }: NetworkPanelProps
                     minColumns={PIXEL_DENSITY.networkChart.minColumns}
                     maxColumns={PIXEL_DENSITY.networkChart.maxColumns}
                     color="var(--color-network-rx)"
+                    toneScale="networkRx"
                   />
                   <DotMatrixChart
                     values={txValues}
@@ -174,6 +175,7 @@ export function NetworkPanel({ snapshot, networkByInterface }: NetworkPanelProps
                     maxColumns={PIXEL_DENSITY.networkChart.maxColumns}
                     color="var(--color-network-tx)"
                     invert
+                    toneScale="networkTx"
                   />
                 </div>
                 <div className="flex items-center justify-between gap-3 text-[10px] uppercase tracking-normal text-[var(--color-text-muted)]">

@@ -65,7 +65,13 @@ export function DiskPanel({ snapshot }: DiskPanelProps) {
                 <span className="truncate" title={disk.label}>{disk.label}</span>
                 <strong>{formatBytes(disk.totalBytes)}</strong>
               </div>
-              <TerminalMeter label="U" value={usedPercent} detail={formatBytes(disk.usedBytes)} color={disk.isSwap ? "var(--color-warning)" : "var(--color-disk)"} />
+              <TerminalMeter
+                label="U"
+                value={usedPercent}
+                detail={formatBytes(disk.usedBytes)}
+                color={disk.isSwap ? "var(--color-warning)" : "var(--color-disk)"}
+                toneScale={disk.isSwap ? "warning" : "disk"}
+              />
               <TerminalMeter label="F" value={freePercent} detail={formatBytes(freeBytes)} color="var(--color-cpu)" />
               <div className="btop-io-row">
                 <span>{disk.isSwap ? "IO" : t("read")}</span>
