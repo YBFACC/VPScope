@@ -31,31 +31,37 @@ export function NetworkPanel({ snapshot, rxHistory, txHistory }: NetworkPanelPro
     >
       <div className="grid h-full min-h-0 grid-rows-[auto_auto_minmax(0,1fr)] gap-2">
         <div className="grid min-h-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-1.5">
-          <div className="pixel-card grid min-h-0 grid-rows-[auto_48px] gap-1.5 p-1.5">
+          <div className="pixel-card grid min-h-0 overflow-hidden grid-rows-[auto_44px] gap-1.5 p-1.5">
             <div className="flex items-baseline justify-between gap-2 font-mono">
               <span className="text-[10px] uppercase text-[var(--color-text-muted)]">{t("rx")}</span>
               <span className="truncate text-sm text-[var(--color-network-rx)] tabular-nums">{formatRate(rxTotalRate)}</span>
             </div>
-            <Sparkline
-              values={rxHistory.map((point) => point.value)}
-              color="var(--color-network-rx)"
-              fillColor="var(--color-accent-soft)"
-              max={maxRate}
-              strokeWidth={2.2}
-            />
+            <div className="min-h-0 overflow-hidden">
+              <Sparkline
+                values={rxHistory.map((point) => point.value)}
+                color="var(--color-network-rx)"
+                fillColor="var(--color-accent-soft)"
+                max={maxRate}
+                height={40}
+                strokeWidth={2.2}
+              />
+            </div>
           </div>
-          <div className="pixel-card grid min-h-0 grid-rows-[auto_48px] gap-1.5 p-1.5">
+          <div className="pixel-card grid min-h-0 overflow-hidden grid-rows-[auto_44px] gap-1.5 p-1.5">
             <div className="flex items-baseline justify-between gap-2 font-mono">
               <span className="text-[10px] uppercase text-[var(--color-text-muted)]">{t("tx")}</span>
               <span className="truncate text-sm text-[var(--color-network-tx)] tabular-nums">{formatRate(txTotalRate)}</span>
             </div>
-            <Sparkline
-              values={txHistory.map((point) => point.value)}
-              color="var(--color-network-tx)"
-              fillColor="var(--color-accent-soft)"
-              max={maxRate}
-              strokeWidth={2.2}
-            />
+            <div className="min-h-0 overflow-hidden">
+              <Sparkline
+                values={txHistory.map((point) => point.value)}
+                color="var(--color-network-tx)"
+                fillColor="var(--color-accent-soft)"
+                max={maxRate}
+                height={40}
+                strokeWidth={2.2}
+              />
+            </div>
           </div>
         </div>
         <div className="pixel-card grid gap-1.5 p-1.5 font-mono text-[10px]">
