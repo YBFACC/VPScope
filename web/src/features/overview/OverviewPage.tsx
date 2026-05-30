@@ -1,9 +1,12 @@
 import clsx from "clsx";
+import { ChevronDownIcon, ChevronUpIcon, TerminalIcon } from "@/features/hosts/HostActionIcons";
 import { HostConnectionBadge } from "@/features/hosts/HostConnectionBadge";
 import { useI18n } from "@/i18n/useI18n";
-import { formatDateTime, formatDuration, formatPercent, formatRate } from "@/lib/format";
+import { formatDuration, formatPercent, formatRate } from "@/lib/format";
 import type { HistoryPoint } from "@/lib/historyBuffer";
+import { useHostStore } from "@/stores/hostStore";
 import type { MetricHistory } from "@/stores/metricsStore";
+import { useTerminalSettingsStore } from "@/stores/terminalSettingsStore";
 import type { AppError, HostConfig, HostConnectionState, HostSnapshot } from "@/types/contracts";
 
 type OverviewPageProps = {
@@ -260,7 +263,6 @@ function NetworkMetricCell({
   txLabel,
   rxValue,
   txValue,
-  totalLabel,
   peakLabel,
   rxHistory,
   txHistory,
@@ -270,7 +272,6 @@ function NetworkMetricCell({
   txLabel: string;
   rxValue: string;
   txValue: string;
-  totalLabel: string;
   peakLabel: string;
   rxHistory: Array<HistoryPoint<number>>;
   txHistory: Array<HistoryPoint<number>>;
@@ -284,7 +285,6 @@ function NetworkMetricCell({
     <div className="overview-network-cell">
       <div className={metricHeaderClass}>
         <span className={metricLabelClass}>{label}</span>
-        <span className="min-w-0 truncate text-right text-[10px] uppercase text-[var(--color-text-muted)]">{totalLabel}</span>
       </div>
       <div className="overview-network-speed">
         <NetworkSpeedGauge rate={totalRate} peak={peakRate} peakLabel={peakLabel} />
@@ -311,6 +311,10 @@ export function OverviewPage({
   onOpenHost,
 }: OverviewPageProps) {
   const { t } = useI18n();
+  const moveHost = useHostStore((state) => state.moveHost);
+  const isReordering = useHostStore((state) => state.isReordering);
+  const openHostTerminal = useTerminalSettingsStore((state) => state.openHostTerminal);
+  const openingHostIds = useTerminalSettingsStore((state) => state.openingHostIds);
 
   return (
     <section className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-2 overflow-hidden rounded-[var(--radius-panel)] border border-[var(--color-border)] bg-[var(--color-panel-glass)] p-2 font-mono shadow-[var(--shadow-panel)]">
@@ -324,17 +328,11 @@ export function OverviewPage({
             {t("hostsConfigured", { count: hosts.length })} · {isSubscribing ? t("connecting") : t("streamingMetrics")}
           </div>
         </div>
-        <div className="hidden shrink-0 grid-cols-4 gap-2 text-[10px] uppercase text-[var(--color-text-muted)] xl:grid">
-          <span>{t("cpu")}</span>
-          <span>{t("memory")}</span>
-          <span>{t("worstDisk")}</span>
-          <span>{t("network")}</span>
-        </div>
       </div>
 
       <div className="scrollbar-none min-h-0 overflow-auto">
         <div className="grid min-w-[760px] gap-1.5">
-          {hosts.map((host) => {
+          {hosts.map((host, index) => {
             const snapshot = snapshots[host.id];
             const connection = connectionStates[host.id];
             const error = errorsByHost[host.id] ?? connection?.lastError;
@@ -363,7 +361,7 @@ export function OverviewPage({
                   }
                 }}
                 className={clsx(
-                  "pixel-card grid min-h-20 min-w-0 cursor-default grid-cols-[220px_88px_repeat(2,minmax(96px,1fr))_minmax(120px,0.9fr)_minmax(250px,0.72fr)_152px] items-center gap-x-5 gap-y-3 p-2 text-[11px] outline-none transition-colors",
+                  "pixel-card grid min-h-20 min-w-0 cursor-default grid-cols-[220px_88px_repeat(2,minmax(96px,1fr))_minmax(120px,0.9fr)_minmax(250px,0.72fr)_84px] items-center gap-x-5 gap-y-3 p-2 text-[11px] outline-none transition-colors",
                   "hover:border-[var(--color-border-strong)] hover:bg-[var(--color-row-hover)] focus:border-[var(--color-accent)] focus:shadow-[inset_3px_0_0_var(--color-accent),var(--shadow-glow)]",
                 )}
               >
@@ -383,6 +381,9 @@ export function OverviewPage({
                 <div className="min-w-0">
                   <div className="mb-1 text-[9px] uppercase text-[var(--color-text-muted)]">{t("status")}</div>
                   <HostConnectionBadge state={connection} />
+                  <div className="mt-1 truncate text-[10px] text-[var(--color-text-muted)] tabular-nums">
+                    {t("uptime")} {snapshot ? formatDuration(snapshot.system.uptimeSec) : "--"}
+                  </div>
                 </div>
 
                 <MetricCell
@@ -409,25 +410,53 @@ export function OverviewPage({
                   txLabel={t("tx")}
                   rxValue={snapshot ? formatRate(rx) : "--"}
                   txValue={snapshot ? formatRate(tx) : "--"}
-                  totalLabel={t("total")}
                   peakLabel={t("peak")}
                   rxHistory={rxHistory}
                   txHistory={txHistory}
                 />
 
-                <div className="grid min-w-0 gap-1 text-right text-[11px] text-[var(--color-text-muted)]">
-                  <div className="truncate tabular-nums">
-                    {t("load")} {snapshot ? snapshot.system.loadAvg.map((value) => value.toFixed(2)).join(" ") : "--"}
+                <div className="flex min-w-0 items-center justify-end gap-1.5">
+                  <div className="host-segmented-control">
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void moveHost(host.id, "up");
+                      }}
+                      disabled={index === 0 || isReordering}
+                      className="host-icon-button host-icon-button-segment rounded-l-[var(--radius-control)]"
+                      title={t("moveHostUp")}
+                      aria-label={t("moveHostUp")}
+                    >
+                      <ChevronUpIcon />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void moveHost(host.id, "down");
+                      }}
+                      disabled={index === hosts.length - 1 || isReordering}
+                      className="host-icon-button host-icon-button-segment rounded-r-[var(--radius-control)]"
+                      title={t("moveHostDown")}
+                      aria-label={t("moveHostDown")}
+                    >
+                      <ChevronDownIcon />
+                    </button>
                   </div>
-                  <div className="truncate tabular-nums">
-                    {t("uptime")} {snapshot ? formatDuration(snapshot.system.uptimeSec) : "--"}
-                  </div>
-                  <div className="truncate tabular-nums">
-                    {t("processes")} {snapshot ? snapshot.processes.length : "--"}
-                  </div>
-                  <div className="truncate tabular-nums">
-                    {t("last")} {snapshot ? formatDateTime(snapshot.ts) : t("never")}
-                  </div>
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void openHostTerminal(host.id);
+                    }}
+                    disabled={Boolean(openingHostIds[host.id])}
+                    className="host-icon-button"
+                    title={openingHostIds[host.id] ? t("openingTerminal") : t("openTerminal")}
+                    aria-label={openingHostIds[host.id] ? t("openingTerminal") : t("openTerminal")}
+                  >
+                    {openingHostIds[host.id] ? <span className="host-icon-loading" /> : <TerminalIcon />}
+                  </button>
                 </div>
               </article>
             );
