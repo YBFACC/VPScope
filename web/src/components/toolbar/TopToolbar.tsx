@@ -6,7 +6,11 @@ import { useHostStore, useSelectedHost } from "@/stores/hostStore";
 import { useMetricsStore } from "@/stores/metricsStore";
 import { useUiStore } from "@/stores/uiStore";
 
-export function TopToolbar() {
+type TopToolbarProps = {
+  onAddHost: () => void;
+};
+
+export function TopToolbar({ onAddHost }: TopToolbarProps) {
   const [mode, setMode] = useState<ClientMode>(clientMode);
   const host = useSelectedHost();
   const hosts = useHostStore((state) => state.hosts);
@@ -67,6 +71,27 @@ export function TopToolbar() {
             </button>
           ))}
         </div>
+        <button
+          type="button"
+          onClick={onAddHost}
+          className="control-button icon-button grid h-6 w-6 place-items-center text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
+          title={t("addHost")}
+          aria-label={t("addHost")}
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 20 20"
+            className="block h-[18px] w-[18px]"
+            fill="none"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="1.8"
+          >
+            <path d="M10 4.5v11" />
+            <path d="M4.5 10h11" />
+          </svg>
+        </button>
         <button
           type="button"
           onClick={() => setSettingsOpen(true)}

@@ -2,6 +2,7 @@ import type { ReactElement } from "react";
 import { useEffect, useState } from "react";
 import { EmptyState } from "@/components/empty/EmptyState";
 import { TopToolbar } from "@/components/toolbar/TopToolbar";
+import { HostForm } from "@/features/hosts/HostForm";
 import { OverviewPage } from "@/features/overview/OverviewPage";
 import { useI18n } from "@/i18n/useI18n";
 import { runClient, tauriClient } from "@/lib/tauriClient";
@@ -26,6 +27,7 @@ export function DashboardPage() {
   const [isWindowVisible, setIsWindowVisible] = useState(
     () => typeof document === "undefined" || document.visibilityState !== "hidden",
   );
+  const [hostFormOpen, setHostFormOpen] = useState(false);
   const loadHosts = useHostStore((state) => state.loadHosts);
   const isLoadingHosts = useHostStore((state) => state.isLoading);
   const hosts = useHostStore((state) => state.hosts);
@@ -236,7 +238,7 @@ export function DashboardPage() {
   return (
     <main className="cockpit-surface h-screen overflow-hidden bg-[var(--color-bg)] p-1 text-[var(--color-text)]">
       <div className="grid h-full w-full grid-rows-[auto_minmax(0,1fr)] gap-1">
-        <TopToolbar />
+        <TopToolbar onAddHost={() => setHostFormOpen(true)} />
 
         <div className="grid min-h-0 grid-cols-1 gap-1">
           <section className="min-h-0">
@@ -275,6 +277,7 @@ export function DashboardPage() {
           </section>
         </div>
       </div>
+      <HostForm open={hostFormOpen} onClose={() => setHostFormOpen(false)} />
     </main>
   );
 }
