@@ -15,7 +15,7 @@ export type NetworkInterfaceHistory = {
   tx: Array<HistoryPoint<number>>;
 };
 
-type MetricHistory = {
+export type MetricHistory = {
   cpu: Array<HistoryPoint<number>>;
   memory: Array<HistoryPoint<number>>;
   networkByInterface: Record<string, NetworkInterfaceHistory>;

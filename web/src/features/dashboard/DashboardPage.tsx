@@ -45,6 +45,7 @@ export function DashboardPage() {
   const isSubscribing = useMetricsStore((state) => state.isSubscribing);
   const ingestMetricsError = useMetricsStore((state) => state.ingestMetricsError);
   const snapshots = useMetricsStore((state) => state.snapshots);
+  const histories = useMetricsStore((state) => state.histories);
   const errorsByHost = useMetricsStore((state) => state.errorsByHost);
   const alertSettings = useAlertSettingsStore((state) => state.settings);
   const loadAlertSettings = useAlertSettingsStore((state) => state.load);
@@ -250,6 +251,7 @@ export function DashboardPage() {
               <OverviewPage
                 hosts={hosts}
                 snapshots={snapshots}
+                histories={histories}
                 connectionStates={connectionStates}
                 errorsByHost={errorsByHost}
                 isSubscribing={isSubscribing}

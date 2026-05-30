@@ -555,6 +555,123 @@ input::placeholder {
   vector-effect: non-scaling-stroke;
 }
 
+.overview-network-cell {
+  display: grid;
+  min-width: 0;
+  border-left: 1px solid color-mix(in srgb, var(--color-border-subtle) 72%, transparent);
+  padding-left: 1rem;
+}
+
+.overview-network-speed {
+  display: grid;
+  min-width: 0;
+  width: max-content;
+  max-width: 100%;
+  grid-template-columns: 8rem 7.2rem;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.overview-network-gauge {
+  display: grid;
+  min-width: 0;
+  grid-template-rows: 1.55rem auto;
+  align-items: end;
+  justify-items: center;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--color-border-subtle) 80%, transparent);
+  background:
+    radial-gradient(circle at 50% 96%, color-mix(in srgb, currentColor 13%, transparent), transparent 52%),
+    linear-gradient(180deg, color-mix(in srgb, var(--color-input) 74%, transparent), color-mix(in srgb, var(--color-panel) 68%, transparent));
+  padding: 1px 3px 2px;
+}
+
+.overview-network-gauge-svg {
+  display: block;
+  height: 1.55rem;
+  width: 100%;
+  overflow: visible;
+}
+
+.overview-network-gauge-track,
+.overview-network-gauge-fill,
+.overview-network-gauge-tick {
+  fill: none;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.overview-network-gauge-track {
+  stroke: color-mix(in srgb, var(--color-border-strong) 58%, transparent);
+  stroke-width: 5.4;
+  opacity: 0.72;
+}
+
+.overview-network-gauge-fill {
+  stroke: currentColor;
+  stroke-width: 5.4;
+  filter: drop-shadow(0 0 4px color-mix(in srgb, currentColor 52%, transparent));
+}
+
+.overview-network-gauge-tick {
+  stroke: var(--color-panel);
+  stroke-width: 1.2;
+  opacity: 0.86;
+}
+
+.overview-network-gauge-needle {
+  stroke: currentColor;
+  stroke-width: 1.3;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+  opacity: 0.94;
+}
+
+.overview-network-gauge-pin {
+  fill: currentColor;
+  opacity: 0.92;
+}
+
+.overview-network-gauge-value {
+  max-width: 100%;
+  color: var(--color-text);
+  font-size: 9.5px;
+  line-height: 1;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.overview-network-gauge-peak {
+  max-width: 100%;
+  color: var(--color-text-muted);
+  font-size: 8.5px;
+  line-height: 1.05;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.overview-network-rates {
+  display: grid;
+  min-width: 0;
+  width: 7.2rem;
+  overflow: hidden;
+  gap: 0.12rem;
+  font-size: 10px;
+  line-height: 1.15;
+  text-align: left;
+}
+
+.overview-network-rates span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .btop-dashboard-grid {
   grid-template-columns: minmax(480px, 45fr) minmax(620px, 55fr);
   grid-template-rows: minmax(220px, 30fr) minmax(0, 70fr);

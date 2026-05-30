@@ -1,12 +1,15 @@
 import clsx from "clsx";
 import { HostConnectionBadge } from "@/features/hosts/HostConnectionBadge";
 import { useI18n } from "@/i18n/useI18n";
-import { formatBytes, formatDateTime, formatDuration, formatPercent, formatRate } from "@/lib/format";
+import { formatDateTime, formatDuration, formatPercent, formatRate } from "@/lib/format";
+import type { HistoryPoint } from "@/lib/historyBuffer";
+import type { MetricHistory } from "@/stores/metricsStore";
 import type { AppError, HostConfig, HostConnectionState, HostSnapshot } from "@/types/contracts";
 
 type OverviewPageProps = {
   hosts: HostConfig[];
   snapshots: Record<string, HostSnapshot | undefined>;
+  histories: Record<string, MetricHistory | undefined>;
   connectionStates: Record<string, HostConnectionState | undefined>;
   errorsByHost: Record<string, AppError | undefined>;
   isSubscribing: boolean;
@@ -40,6 +43,129 @@ function maxDiskPercent(snapshot?: HostSnapshot) {
 
 function sumNetwork(snapshot: HostSnapshot | undefined, key: "rxBytesPerSec" | "txBytesPerSec") {
   return snapshot?.network.reduce((total, iface) => total + iface[key], 0) ?? 0;
+}
+
+function aggregateNetworkHistory(
+  history: MetricHistory | undefined,
+  key: "rx" | "tx",
+  fallbackValue: number | undefined,
+) {
+  const pointsByTimestamp = new Map<number, number>();
+
+  for (const ifaceHistory of Object.values(history?.networkByInterface ?? {})) {
+    for (const point of ifaceHistory[key]) {
+      pointsByTimestamp.set(point.ts, (pointsByTimestamp.get(point.ts) ?? 0) + point.value);
+    }
+  }
+
+  const points = Array.from(pointsByTimestamp, ([ts, value]) => ({ ts, value })).sort((left, right) => left.ts - right.ts);
+
+  if (points.length > 0) {
+    return points;
+  }
+
+  return fallbackValue === undefined ? [] : [{ ts: 0, value: fallbackValue }];
+}
+
+const networkGaugeBands = [
+  { max: 64 * 1024, label: "64K", tone: "var(--color-network-tx)" },
+  { max: 1024 * 1024, label: "1M", tone: "var(--color-accent)" },
+  { max: 16 * 1024 * 1024, label: "16M", tone: "var(--color-warning)" },
+  { max: 128 * 1024 * 1024, label: "128M+", tone: "var(--color-danger)" },
+] as const;
+
+function networkGaugeRatio(rateBytesPerSec: number) {
+  if (rateBytesPerSec <= 0) {
+    return 0;
+  }
+
+  const bandIndex = networkGaugeBands.findIndex((band) => rateBytesPerSec <= band.max);
+
+  if (bandIndex === -1) {
+    return 1;
+  }
+
+  const previousMax = bandIndex === 0 ? 0 : networkGaugeBands[bandIndex - 1].max;
+  const bandRange = networkGaugeBands[bandIndex].max - previousMax;
+  const bandProgress = bandRange > 0 ? (rateBytesPerSec - previousMax) / bandRange : 1;
+
+  return Math.min(1, (bandIndex + Math.max(0, Math.min(1, bandProgress))) / networkGaugeBands.length);
+}
+
+function networkGaugeBand(rateBytesPerSec: number) {
+  const band = networkGaugeBands.find((item) => rateBytesPerSec <= item.max);
+
+  return band ?? networkGaugeBands[networkGaugeBands.length - 1];
+}
+
+function gaugePoint(angleDegrees: number, radius: number) {
+  const radians = (angleDegrees * Math.PI) / 180;
+
+  return {
+    x: 42 + Math.cos(radians) * radius,
+    y: 42 + Math.sin(radians) * radius,
+  };
+}
+
+function gaugeArc(endRatio: number) {
+  const startAngle = 180;
+  const endAngle = 180 + endRatio * 180;
+  const start = gaugePoint(startAngle, 31);
+  const end = gaugePoint(endAngle, 31);
+
+  return `M ${start.x.toFixed(2)} ${start.y.toFixed(2)} A 31 31 0 0 1 ${end.x.toFixed(2)} ${end.y.toFixed(2)}`;
+}
+
+function totalNetworkPeak(rxHistory: Array<HistoryPoint<number>>, txHistory: Array<HistoryPoint<number>>, currentRate: number) {
+  const totalsByTimestamp = new Map<number, number>();
+
+  for (const point of rxHistory) {
+    totalsByTimestamp.set(point.ts, (totalsByTimestamp.get(point.ts) ?? 0) + point.value);
+  }
+
+  for (const point of txHistory) {
+    totalsByTimestamp.set(point.ts, (totalsByTimestamp.get(point.ts) ?? 0) + point.value);
+  }
+
+  return Math.max(currentRate, ...totalsByTimestamp.values());
+}
+
+function NetworkSpeedGauge({ rate, peak, peakLabel }: { rate: number; peak: number; peakLabel: string }) {
+  const ratio = networkGaugeRatio(rate);
+  const band = networkGaugeBand(rate);
+  const needleAngle = 180 + ratio * 180;
+  const needle = gaugePoint(needleAngle, 24);
+
+  return (
+    <div className="overview-network-gauge" style={{ color: band.tone }} aria-hidden="true">
+      <svg className="overview-network-gauge-svg" viewBox="0 0 84 52" preserveAspectRatio="xMidYMid meet">
+        <path d={gaugeArc(1)} className="overview-network-gauge-track" />
+        {networkGaugeBands.map((_, index) => {
+          const angle = 180 + ((index + 1) / networkGaugeBands.length) * 180;
+          const inner = gaugePoint(angle, 25);
+          const outer = gaugePoint(angle, 33);
+
+          return (
+            <line
+              key={index}
+              x1={inner.x.toFixed(2)}
+              y1={inner.y.toFixed(2)}
+              x2={outer.x.toFixed(2)}
+              y2={outer.y.toFixed(2)}
+              className="overview-network-gauge-tick"
+            />
+          );
+        })}
+        {ratio > 0 ? <path d={gaugeArc(ratio)} className="overview-network-gauge-fill" /> : null}
+        <line x1="42" y1="42" x2={needle.x.toFixed(2)} y2={needle.y.toFixed(2)} className="overview-network-gauge-needle" />
+        <circle cx="42" cy="42" r="2.4" className="overview-network-gauge-pin" />
+      </svg>
+      <div className="overview-network-gauge-value tabular-nums">{formatRate(rate)}</div>
+      <div className="overview-network-gauge-peak tabular-nums">
+        {band.label} · {peakLabel} {formatRate(peak)}
+      </div>
+    </div>
+  );
 }
 
 function healthFor(snapshot: HostSnapshot | undefined, connection?: HostConnectionState, error?: AppError): HostHealth {
@@ -134,29 +260,43 @@ function NetworkMetricCell({
   txLabel,
   rxValue,
   txValue,
-  meter,
+  totalLabel,
+  peakLabel,
+  rxHistory,
+  txHistory,
 }: {
   label: string;
   rxLabel: string;
   txLabel: string;
   rxValue: string;
   txValue: string;
-  meter?: number;
+  totalLabel: string;
+  peakLabel: string;
+  rxHistory: Array<HistoryPoint<number>>;
+  txHistory: Array<HistoryPoint<number>>;
 }) {
+  const rxRate = rxHistory.at(-1)?.value ?? 0;
+  const txRate = txHistory.at(-1)?.value ?? 0;
+  const totalRate = rxRate + txRate;
+  const peakRate = totalNetworkPeak(rxHistory, txHistory, totalRate);
+
   return (
-    <div className="min-w-0">
+    <div className="overview-network-cell">
       <div className={metricHeaderClass}>
         <span className={metricLabelClass}>{label}</span>
-        <div className="flex min-w-0 justify-end gap-2 overflow-hidden tabular-nums">
-          <span className="min-w-0 truncate text-[var(--color-network-rx)]">
+        <span className="min-w-0 truncate text-right text-[10px] uppercase text-[var(--color-text-muted)]">{totalLabel}</span>
+      </div>
+      <div className="overview-network-speed">
+        <NetworkSpeedGauge rate={totalRate} peak={peakRate} peakLabel={peakLabel} />
+        <div className="overview-network-rates tabular-nums">
+          <span className="text-[var(--color-network-rx)]">
             {rxLabel} {rxValue}
           </span>
-          <span className="min-w-0 truncate text-[var(--color-network-tx)]">
+          <span className="text-[var(--color-network-tx)]">
             {txLabel} {txValue}
           </span>
         </div>
       </div>
-      <MiniMeter value={meter} color="var(--color-accent)" />
     </div>
   );
 }
@@ -164,6 +304,7 @@ function NetworkMetricCell({
 export function OverviewPage({
   hosts,
   snapshots,
+  histories,
   connectionStates,
   errorsByHost,
   isSubscribing,
@@ -203,6 +344,9 @@ export function OverviewPage({
             const diskPercent = maxDiskPercent(snapshot);
             const rx = sumNetwork(snapshot, "rxBytesPerSec");
             const tx = sumNetwork(snapshot, "txBytesPerSec");
+            const history = histories[host.id];
+            const rxHistory = aggregateNetworkHistory(history, "rx", snapshot ? rx : undefined);
+            const txHistory = aggregateNetworkHistory(history, "tx", snapshot ? tx : undefined);
             const health = healthFor(snapshot, connection, error);
             const healthTone = healthColor(health);
 
@@ -219,7 +363,7 @@ export function OverviewPage({
                   }
                 }}
                 className={clsx(
-                  "pixel-card grid min-h-20 min-w-0 cursor-default grid-cols-[220px_88px_repeat(4,minmax(96px,1fr))_112px] items-center gap-3 p-2 text-[11px] outline-none transition-colors",
+                  "pixel-card grid min-h-20 min-w-0 cursor-default grid-cols-[220px_88px_repeat(2,minmax(96px,1fr))_minmax(120px,0.9fr)_minmax(250px,0.72fr)_152px] items-center gap-x-5 gap-y-3 p-2 text-[11px] outline-none transition-colors",
                   "hover:border-[var(--color-border-strong)] hover:bg-[var(--color-row-hover)] focus:border-[var(--color-accent)] focus:shadow-[inset_3px_0_0_var(--color-accent),var(--shadow-glow)]",
                 )}
               >
@@ -265,7 +409,10 @@ export function OverviewPage({
                   txLabel={t("tx")}
                   rxValue={snapshot ? formatRate(rx) : "--"}
                   txValue={snapshot ? formatRate(tx) : "--"}
-                  meter={snapshot ? Math.min(100, (rx + tx) / 1024 / 1024) : undefined}
+                  totalLabel={t("total")}
+                  peakLabel={t("peak")}
+                  rxHistory={rxHistory}
+                  txHistory={txHistory}
                 />
 
                 <div className="grid min-w-0 gap-1 text-right text-[11px] text-[var(--color-text-muted)]">
