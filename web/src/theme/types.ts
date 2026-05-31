@@ -1,3 +1,5 @@
+export type ThemeToneScale = "cpu" | "memory" | "disk" | "networkRx" | "networkTx" | "warning";
+
 export type VPScopeTheme = {
   id: string;
   name: string;
@@ -42,5 +44,6 @@ export type VPScopeTheme = {
   };
   chart: {
     barSteps: string[];
+    toneScales: Record<ThemeToneScale, string[]>;
   };
 };
