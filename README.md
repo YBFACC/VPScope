@@ -23,23 +23,31 @@ VPScope 是一个面向 macOS 的 VPS 监控桌面应用，目标是提供接近
 
 ## Current Status
 
-仓库当前已经不是纯文档状态，已经包含一版可继续迭代的应用骨架：
+仓库当前已经进入 `0.5.2` 早期可用阶段，已经包含一版可继续迭代的桌面监控应用骨架：
 
 - `web/` 中的 React 桌面监控界面
 - `src-tauri/` 中的 Tauri v2 + Rust 后端
 - 主机配置管理、连接测试、指标订阅、进程列表、托盘设置等命令入口
 - mock 数据模式，前端可在后端未完全联通时独立开发和预览
-- CPU、内存、磁盘、网络、进程、详情等监控面板，支持面板排序、折叠和高密度展示
+- 单主机 Dashboard：CPU、内存、磁盘、网络、进程、详情等监控面板，支持面板排序、折叠和高密度展示
+- 多主机 Overview：按主机卡片扫视健康状态、CPU/内存/磁盘、网络吞吐、连接状态，并支持快速打开详情或终端
 - `/proc`、`df -P`、`ps` 等 Linux 指标解析基础模块，以及采集 profile、最后快照缓存和 mock 数据刷新链路
-- CPU 告警通知、终端打开、设置页、托盘常驻和 macOS release workflow 等桌面应用配套能力
+- CPU 告警通知、终端打开、设置页、托盘常驻、主题切换和 macOS release workflow 等桌面应用配套能力
 
 目前项目仍处于早期开发阶段，重点是把产品方向、契约层和核心监控体验先打稳。
 
 ## Recent Updates
 
-最近几天（2026-05-25 至 2026-05-27）的提交主要补齐了这些能力：
+最近几天（2026-05-28 至 2026-05-31，`v0.5.0` 到 `v0.5.2`）的提交主要补齐了这些能力：
 
-- Dashboard 交互：支持监控面板排序和折叠，优化 CPU、内存、磁盘、网络、进程和详情面板的视觉密度，并修正网络 sparkline、进度条和图表字号在紧凑布局中的表现。
+- Dashboard 密度：继续打磨 CPU、内存、磁盘、网络、进程和详情面板，加入模块级 load tone scales，让图表颜色随负载区间变化，同时保持 btop 风格的高密度扫描体验。
+- Overview 多主机视图：优化主机卡片布局，加入网络速度仪表、峰值参考和更稳的紧凑布局；主机动作按钮改为更清晰的图标操作，支持从总览直接进入详情或打开终端。
+- 顶部工具栏：恢复全局 Add Host 入口，并保留 mock/live 数据模式切换、Overview/List 视图切换和设置入口。
+- 主题系统：重做 `Ops Night`、`Sand Terminal`、`Light Console` 三套调色板，新增主题级 tone scale tokens，减少组件里的视觉硬编码。
+- 截图与发布：更新 README 截图资源，版本推进到 `0.5.2`，继续沿用 macOS release、签名和 notarization 说明。
+
+更早一轮（2026-05-25 至 2026-05-27）的更新还包括：
+
 - 监控数据链路：加入 metrics collection profiles 和 last snapshot cache，改善空闲断连后的稳定性，减少进程列表刷新时的闪烁。
 - 通知与设置：新增 CPU 使用率告警通知、通知权限接入和告警设置存储，同时稳定设置弹窗布局。
 - 主机与终端：支持从主机侧边栏打开终端，新增终端设置存储，并修正 WezTerm 启动逻辑以复用新 tab。
@@ -69,7 +77,7 @@ MVP 明确不包含：
 
 - 在服务器上安装 agent 作为前置条件
 - destructive remote actions，例如 kill、restart、service control
-- Docker、Kubernetes、GPU、历史数据库、告警系统、多主机聚合大盘
+- Docker、Kubernetes、GPU、历史数据库、复杂告警系统、多主机聚合大盘
 
 ## Tech Stack
 
@@ -220,7 +228,7 @@ Remote VPS
 - 完善真实 SSH 采集链路和 session 复用
 - 打磨连接状态、错误态和 known_hosts 交互
 - 提升进程表、历史曲线和高频刷新下的稳定性
-- 优化托盘展示和多主机切换体验
+- 优化托盘展示、Overview 信息密度和多主机切换体验
 - 在 macOS 之外逐步评估 Linux / Windows 桌面支持
 
 ## Contributing
