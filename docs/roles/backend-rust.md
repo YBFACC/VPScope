@@ -188,7 +188,7 @@ Host 配置存放在 app config dir，例如：
 
 ### Step 4: 实现凭据管理
 
-MVP 推荐使用 macOS Keychain。可以先封装 `CredentialStore`，内部实现后续可替换。
+MVP 当前通过 `keyring` 的 Apple native backend 接入 macOS Keychain，并封装在 `CredentialStore` 后面，业务代码只处理 credential ref，不直接持有持久化明文 secret。
 
 接口建议：
 
@@ -199,20 +199,31 @@ impl CredentialStore {
     pub fn save_password(&self, host_id: &str, username: &str, password: &str) -> Result<String, AppError>;
     pub fn get_password(&self, credential_ref: &str) -> Result<String, AppError>;
     pub fn save_passphrase(&self, host_id: &str, passphrase: &str) -> Result<String, AppError>;
+    pub fn get_passphrase(&self, credential_ref: &str) -> Result<String, AppError>;
     pub fn delete_for_host(&self, host_id: &str) -> Result<(), AppError>;
 }
 ```
 
-`credential_ref` 建议格式：
+`credential_ref` 固定格式：
 
 ```text
 vpscope://credential/{host_id}/password
+vpscope://credential/{host_id}/passphrase
 ```
+
+实现规则：
+
+- `auth.password` 和 `auth.passphrase` 只允许作为一次性 command 请求字段。
+- `host_create` / `host_update` 收到明文 secret 后必须立即写入 Keychain，并在返回的 `HostConfig` 与 `hosts.json` 中只保留 `passwordRef` / `passphraseRef`。
+- 同类型更新且未提供新明文 secret 时，保留旧 ref。
+- 认证类型切换后，清理该 host 已不再使用的 Keychain 凭据。
+- 删除 host 后清理该 host 的 password 和 passphrase 凭据。
 
 验收：
 
 - 配置文件中看不到密码。
-- 连接时能从 Keychain 取回凭据。
+- 配置文件中看不到私钥 passphrase。
+- Keychain entry 缺失或 ref 格式错误时返回结构化 `AppError`，不静默降级。
 - 凭据读取失败能返回 `CONFIG_INVALID` 或 `INTERNAL`。
 
 ### Step 5: 选择并封装 SSH Client

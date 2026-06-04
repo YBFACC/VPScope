@@ -360,6 +360,7 @@ SSH 和系统命令是本项目的主要风险点。
 - Tauri capability 只开放必要命令。
 - Rust 层维护命令白名单。
 - 用户凭据存 macOS Keychain，不落普通配置文件。
+- MVP 当前通过 Rust `keyring` 的 Apple native backend 写入 macOS Keychain；host 配置文件只保存 `vpscope://credential/{host_id}/password` 或 `vpscope://credential/{host_id}/passphrase` 引用。
 - private key passphrase 不写日志。
 - known_hosts 默认严格校验，首次连接需要用户确认 fingerprint。
 - 所有远程命令只读，危险操作不进入 MVP。
@@ -456,7 +457,7 @@ alert_settings_update
 - 实现 host 配置模型。
 - 实现 SSH 测试连接。
 - 实现 known_hosts/fingerprint 确认流程。
-- 凭据接入 macOS Keychain。
+- 凭据接入 macOS Keychain，新增/更新 host 时明文 password/passphrase 只作为一次性请求字段，返回和磁盘配置只保留 credential ref。
 
 验收：
 
@@ -525,7 +526,7 @@ pnpm tauri dev
 ## 后续决策点
 
 - SSH Rust crate 选型：MVP 已采用 `openssh` + `native-mux`。后续只有在需要去掉系统 `ssh` 依赖、进一步压低连接开销或增强 host key/agent 控制时，再评估 `russh`、`ssh2`。
-- 凭据存储：使用 Tauri plugin stronghold 还是直接接 macOS Keychain。
+- 凭据存储：MVP 已采用 macOS Keychain。后续只有在需要跨平台统一加密存储或迁移策略时，再评估 Tauri plugin stronghold。
 - 图表实现：SVG 是否足够，还是第一版直接 Canvas。
 - 是否从 MVP 就支持多 host 总览。
 - 是否支持导入 `~/.ssh/config`。

@@ -32,6 +32,10 @@
 ## 手工联调
 
 - [ ] 新增 host。
+- [ ] 新增 password auth host 后，确认 `hosts.json` 只包含 `passwordRef`，Keychain 中存在 `com.vpscope.credentials` 对应 entry。
+- [ ] 新增 private key passphrase host 后，确认 `hosts.json` 只包含 `passphraseRef`，Keychain 中存在对应 entry。
+- [ ] 更新 host 且不填写新 secret 时，确认旧 `passwordRef` / `passphraseRef` 保留。
+- [ ] 切换认证类型或删除 host 后，确认不再使用的 Keychain 凭据被清理。
 - [ ] 测试连接。
 - [ ] 首次连接确认 fingerprint。
 - [ ] Dashboard 连续观察 5 分钟。

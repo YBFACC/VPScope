@@ -33,6 +33,7 @@ MVP 明确不做破坏性远程操作，例如 kill、restart、delete、service
 - 多主机 Overview：按主机快速扫视健康状态、CPU/内存/磁盘占用、网络吞吐和连接状态。
 - 主机管理：主机配置、连接测试、连接状态、错误态和部分数据失败状态。
 - 数据链路：通过 `/proc`、`df -P`、`ps` 等只读来源采集 Linux 指标。
+- 安全存储：新增或更新 host 时，密码和私钥 passphrase 会写入 macOS Keychain，普通 host 配置只保存 `vpscope://credential/...` 引用。
 - 桌面体验：Tauri 应用壳、托盘常驻、设置页、通知能力、主题切换和 macOS 构建流程。
 - Mock 模式：前端可以脱离真实 Tauri/Rust 后端独立开发和预览。
 
@@ -47,6 +48,7 @@ MVP 明确不做破坏性远程操作，例如 kill、restart、delete、service
 - State: `Zustand`
 - Virtualized list: `@tanstack/react-virtual`
 - SSH: Rust 层通过 `openssh` 维护连接与采集
+- Credential storage: Rust 层通过 `keyring` 的 Apple native backend 接入 macOS Keychain
 
 ## 目录结构
 
@@ -132,7 +134,8 @@ Remote VPS
 - SSH 和远程命令执行属于 Rust 后端，不属于前端。
 - 前端不能传入任意 shell 命令字符串。
 - 远程采集只使用固定的只读命令和 `/proc` 数据源。
-- 敏感值不能存进普通 JSON/TOML 配置文件。
+- 敏感值不能存进普通 JSON/TOML 配置文件；`auth.password` 和 `auth.passphrase` 只作为一次性请求字段进入后端，后端立即写入 macOS Keychain，并在返回值和 `hosts.json` 中只保留 `passwordRef` / `passphraseRef`。
+- 删除 host 或切换认证类型时，后端会清理该 host 已不再使用的 Keychain 凭据。
 - 命令、事件、数据结构或错误码发生变化时，必须同步更新契约文档、前端类型、Rust serde 结构、mock 数据和测试。
 
 ## 文档入口
