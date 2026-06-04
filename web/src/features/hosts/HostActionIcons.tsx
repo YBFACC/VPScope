@@ -24,6 +24,14 @@ export function XIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+export function TrashIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true" {...props}>
+      <path d="M5.25 5.25v7M8 5.25v7M10.75 5.25v7M3.5 3.5h9M6 3.5V2.25h4V3.5M4.25 3.5l.5 10.25h6.5l.5-10.25" />
+    </svg>
+  );
+}
+
 export function TerminalIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 16 16" aria-hidden="true" {...props}>

@@ -1,5 +1,6 @@
+import { useState } from "react";
 import clsx from "clsx";
-import { ChevronDownIcon, ChevronUpIcon, TerminalIcon } from "@/features/hosts/HostActionIcons";
+import { ChevronDownIcon, ChevronUpIcon, TerminalIcon, TrashIcon } from "@/features/hosts/HostActionIcons";
 import { HostConnectionBadge } from "@/features/hosts/HostConnectionBadge";
 import { useI18n } from "@/i18n/useI18n";
 import { formatDuration, formatPercent, formatRate } from "@/lib/format";
@@ -312,9 +313,24 @@ export function OverviewPage({
 }: OverviewPageProps) {
   const { t } = useI18n();
   const moveHost = useHostStore((state) => state.moveHost);
+  const deleteHost = useHostStore((state) => state.deleteHost);
   const isReordering = useHostStore((state) => state.isReordering);
   const openHostTerminal = useTerminalSettingsStore((state) => state.openHostTerminal);
   const openingHostIds = useTerminalSettingsStore((state) => state.openingHostIds);
+  const [deletingHostIds, setDeletingHostIds] = useState<Record<string, boolean>>({});
+
+  async function removeHostFromList(hostId: string) {
+    setDeletingHostIds((current) => ({ ...current, [hostId]: true }));
+
+    try {
+      await deleteHost(hostId);
+    } finally {
+      setDeletingHostIds((current) => {
+        const { [hostId]: _deleted, ...next } = current;
+        return next;
+      });
+    }
+  }
 
   return (
     <section className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-2 overflow-hidden rounded-[var(--radius-panel)] border border-[var(--color-border)] bg-[var(--color-panel-glass)] p-2 font-mono shadow-[var(--shadow-panel)]">
@@ -361,7 +377,7 @@ export function OverviewPage({
                   }
                 }}
                 className={clsx(
-                  "pixel-card grid min-h-20 min-w-0 cursor-default grid-cols-[220px_88px_repeat(2,minmax(96px,1fr))_minmax(120px,0.9fr)_minmax(250px,0.72fr)_84px] items-center gap-x-5 gap-y-3 p-2 text-[11px] outline-none transition-colors",
+                  "pixel-card grid min-h-20 min-w-0 cursor-default grid-cols-[220px_88px_repeat(2,minmax(96px,1fr))_minmax(120px,0.9fr)_minmax(250px,0.72fr)_118px] items-center gap-x-5 gap-y-3 p-2 text-[11px] outline-none transition-colors",
                   "hover:border-[var(--color-border-strong)] hover:bg-[var(--color-row-hover)] focus:border-[var(--color-accent)] focus:shadow-[inset_3px_0_0_var(--color-accent),var(--shadow-glow)]",
                 )}
               >
@@ -456,6 +472,19 @@ export function OverviewPage({
                     aria-label={openingHostIds[host.id] ? t("openingTerminal") : t("openTerminal")}
                   >
                     {openingHostIds[host.id] ? <span className="host-icon-loading" /> : <TerminalIcon />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void removeHostFromList(host.id);
+                    }}
+                    disabled={Boolean(deletingHostIds[host.id])}
+                    className="host-icon-button host-icon-button-danger"
+                    title={deletingHostIds[host.id] ? t("removingHost") : t("removeHostFromList")}
+                    aria-label={deletingHostIds[host.id] ? t("removingHost") : t("removeHostFromList")}
+                  >
+                    {deletingHostIds[host.id] ? <span className="host-icon-loading" /> : <TrashIcon />}
                   </button>
                 </div>
               </article>
