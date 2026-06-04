@@ -253,13 +253,10 @@ type HostSnapshot = {
 核心组件：
 
 - `MetricPanel`: 带标题、边框、状态色、操作区的通用面板
-- `BarMeter`: 类似 btop 的分段条
-- `Sparkline`: 小型历史曲线
-- `CoreGrid`: CPU core 使用率矩阵
+- `TerminalMeter`: 类似 btop 的分段条
+- `DotMatrixChart`: 小型历史矩阵图
 - `ProcessTable`: 支持排序、过滤、虚拟滚动
-- `HostSidebar`: 多 VPS 切换和连接状态
-- `CommandPalette`: 快速切换 host、搜索进程、打开设置
-- `ThemeEditor`: 调整 theme token 并即时预览
+- `OverviewPage`: 多 VPS 总览、切换入口和连接状态
 
 交互：
 

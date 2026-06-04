@@ -62,11 +62,9 @@ web/src/
     panel/
       MetricPanel.tsx
     meter/
-      BarMeter.tsx
-      GaugeNumber.tsx
+      TerminalMeter.tsx
     chart/
-      Sparkline.tsx
-      HistoryGrid.tsx
+      DotMatrixChart.tsx
     table/
       ProcessTable.tsx
     toolbar/
@@ -81,16 +79,11 @@ web/src/
       DiskPanel.tsx
       NetworkPanel.tsx
       ProcessPanel.tsx
-      DetailsPanel.tsx
     hosts/
-      HostSidebar.tsx
       HostForm.tsx
       HostConnectionBadge.tsx
     settings/
       SettingsPage.tsx
-    themes/
-      ThemePicker.tsx
-      ThemeEditor.tsx
   lib/
     tauriClient.ts
     format.ts
@@ -318,16 +311,15 @@ export type VPScopeTheme = {
 - props: `title`、`accent`、`actions`、`children`、`status`。
 - 显示 panel 边框、标题和右上角动作。
 
-`BarMeter`：
+`TerminalMeter`：
 
-- props: `value`、`max`、`steps`、`color`、`label`。
+- props: `value`、`color`、`label`、`toneScale`。
 - 用 theme 的 bar track 和色阶。
 
-`Sparkline`：
+`DotMatrixChart`：
 
-- props: `values`、`color`、`height`。
-- 第一版用 SVG 即可。
-- 如果数据点超过 300，再考虑 Canvas。
+- props: `values`、`color`、`max`、`rows`、`minColumns`、`maxColumns`、`toneScale`。
+- 用密集矩阵呈现历史曲线，适配 btop 风格面板密度。
 
 `ProcessTable`：
 
