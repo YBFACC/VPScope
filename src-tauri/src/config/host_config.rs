@@ -11,6 +11,8 @@ pub type HostId = String;
 pub enum HostAuth {
     Password {
         username: String,
+        #[serde(default, skip_serializing)]
+        password: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         password_ref: Option<String>,
     },
@@ -20,6 +22,8 @@ pub enum HostAuth {
         key_path: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         key_ref: Option<String>,
+        #[serde(default, skip_serializing)]
+        passphrase: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         passphrase_ref: Option<String>,
     },

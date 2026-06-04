@@ -34,18 +34,41 @@ function wait(ms = 180) {
 
 function createHostConfig(payload: HostCreatePayload): HostConfig {
   const now = Date.now();
+  const id = `mock-vps-${now}`;
 
   return {
-    id: `mock-vps-${now}`,
+    id,
     name: payload.name,
     address: payload.address,
     port: payload.port,
-    auth: payload.auth,
+    auth: sanitizeHostAuth(id, payload.auth),
     refreshIntervalMs: payload.refreshIntervalMs,
     tags: payload.tags ?? [],
     createdAt: now,
     updatedAt: now,
   };
+}
+
+function sanitizeHostAuth(hostId: HostId, auth: HostCreatePayload["auth"]): HostConfig["auth"] {
+  if (auth.type === "password") {
+    return {
+      type: "password",
+      username: auth.username,
+      passwordRef: auth.password ? `vpscope://credential/${hostId}/password` : auth.passwordRef,
+    };
+  }
+
+  if (auth.type === "private_key") {
+    return {
+      type: "private_key",
+      username: auth.username,
+      keyPath: auth.keyPath,
+      keyRef: auth.keyRef,
+      passphraseRef: auth.passphrase ? `vpscope://credential/${hostId}/passphrase` : auth.passphraseRef,
+    };
+  }
+
+  return auth;
 }
 
 function sortProcesses(payload: ProcessListPayload) {
@@ -139,7 +162,7 @@ export function createMockTauriClient(): VPScopeClient {
       const updated = {
         ...existing,
         ...payload.patch,
-        auth: payload.patch.auth ?? existing.auth,
+        auth: payload.patch.auth ? sanitizeHostAuth(payload.id, payload.patch.auth) : existing.auth,
         tags: payload.patch.tags ?? existing.tags,
         updatedAt: Date.now(),
       };

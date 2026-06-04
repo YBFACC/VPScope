@@ -39,6 +39,8 @@ export type HostAuth =
   | {
       type: "password";
       username: string;
+      // request-only; never serialized in HostConfig responses or hosts.json
+      password?: string;
       passwordRef?: string;
     }
   | {
@@ -46,6 +48,8 @@ export type HostAuth =
       username: string;
       keyPath?: string;
       keyRef?: string;
+      // request-only; never serialized in HostConfig responses or hosts.json
+      passphrase?: string;
       passphraseRef?: string;
     }
   | {
@@ -262,6 +266,11 @@ type HostCreatePayload = {
 type HostCreateResult = HostConfig;
 ```
 
+规则：
+
+- `auth.password` 和 `auth.passphrase` 只允许作为一次性请求字段。后端必须立即写入 macOS Keychain，并在返回的 `HostConfig` 与 `hosts.json` 中只保留 `passwordRef` / `passphraseRef`。
+- `credentialRef` 格式固定为 `vpscope://credential/{hostId}/password` 或 `vpscope://credential/{hostId}/passphrase`。
+
 ### `host_update`
 
 用途：更新服务器配置。敏感字段为空时表示保持原凭据。
@@ -280,6 +289,12 @@ type HostUpdatePayload = {
 ```ts
 type HostUpdateResult = HostConfig;
 ```
+
+规则：
+
+- `patch.auth.password` 或 `patch.auth.passphrase` 缺省时表示保留同类型旧凭据 ref。
+- 提供新的明文 secret 时，后端覆盖对应 Keychain entry，并返回新的 ref。
+- 认证类型切换后，后端必须清理该 host 已不再使用的 Keychain 凭据。
 
 ### `host_reorder`
 

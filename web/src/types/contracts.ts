@@ -21,6 +21,7 @@ export type HostAuth =
   | {
       type: "password";
       username: string;
+      password?: string;
       passwordRef?: string;
     }
   | {
@@ -28,6 +29,7 @@ export type HostAuth =
       username: string;
       keyPath?: string;
       keyRef?: string;
+      passphrase?: string;
       passphraseRef?: string;
     }
   | {

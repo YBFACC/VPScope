@@ -85,7 +85,80 @@ impl ConfigStore {
             .ok_or_else(|| AppError::host_not_found(id))
     }
 
+    pub fn validate_host_create(&self, payload: &HostCreatePayload) -> Result<(), AppError> {
+        validate_host_fields(
+            &payload.name,
+            &payload.address,
+            payload.port,
+            payload.refresh_interval_ms,
+        )?;
+
+        let candidate = HostConfig {
+            id: String::new(),
+            name: payload.name.clone(),
+            address: payload.address.clone(),
+            port: payload.port,
+            auth: payload.auth.clone(),
+            refresh_interval_ms: payload.refresh_interval_ms,
+            tags: payload.tags.clone(),
+            created_at: 0,
+            updated_at: 0,
+        };
+        let hosts = self
+            .hosts
+            .read()
+            .map_err(|_| AppError::internal("Host config lock is poisoned"))?;
+        if hosts
+            .iter()
+            .any(|existing| is_same_endpoint(existing, &candidate))
+        {
+            return Err(AppError::config_invalid(
+                "A host with the same address, port, and username already exists",
+            ));
+        }
+
+        Ok(())
+    }
+
+    pub fn validate_host_update(&self, id: &str, patch: &HostPatch) -> Result<(), AppError> {
+        let hosts = self
+            .hosts
+            .read()
+            .map_err(|_| AppError::internal("Host config lock is poisoned"))?;
+        let index = hosts
+            .iter()
+            .position(|host| host.id == id)
+            .ok_or_else(|| AppError::host_not_found(id))?;
+        let mut updated = hosts[index].clone();
+        apply_host_patch(&mut updated, patch.clone());
+
+        validate_host_fields(
+            &updated.name,
+            &updated.address,
+            updated.port,
+            updated.refresh_interval_ms,
+        )?;
+        if hosts
+            .iter()
+            .any(|candidate| candidate.id != id && is_same_endpoint(candidate, &updated))
+        {
+            return Err(AppError::config_invalid(
+                "A host with the same address, port, and username already exists",
+            ));
+        }
+
+        Ok(())
+    }
+
     pub fn create_host(&self, payload: HostCreatePayload) -> Result<HostConfig, AppError> {
+        self.create_host_with_id(Uuid::new_v4().to_string(), payload)
+    }
+
+    pub fn create_host_with_id(
+        &self,
+        id: String,
+        payload: HostCreatePayload,
+    ) -> Result<HostConfig, AppError> {
         validate_host_fields(
             &payload.name,
             &payload.address,
@@ -95,7 +168,7 @@ impl ConfigStore {
 
         let now = unix_ms();
         let host = HostConfig {
-            id: Uuid::new_v4().to_string(),
+            id,
             name: payload.name,
             address: payload.address,
             port: payload.port,
@@ -134,24 +207,7 @@ impl ConfigStore {
             .ok_or_else(|| AppError::host_not_found(id))?;
         let mut updated = hosts[index].clone();
 
-        if let Some(name) = patch.name {
-            updated.name = name;
-        }
-        if let Some(address) = patch.address {
-            updated.address = address;
-        }
-        if let Some(port) = patch.port {
-            updated.port = port;
-        }
-        if let Some(auth) = patch.auth {
-            updated.auth = auth;
-        }
-        if let Some(refresh_interval_ms) = patch.refresh_interval_ms {
-            updated.refresh_interval_ms = refresh_interval_ms;
-        }
-        if let Some(tags) = patch.tags {
-            updated.tags = tags;
-        }
+        apply_host_patch(&mut updated, patch);
 
         validate_host_fields(
             &updated.name,
@@ -371,6 +427,27 @@ fn auth_username(auth: &HostAuth) -> &str {
         HostAuth::Password { username, .. }
         | HostAuth::PrivateKey { username, .. }
         | HostAuth::SshAgent { username } => username,
+    }
+}
+
+fn apply_host_patch(host: &mut HostConfig, patch: HostPatch) {
+    if let Some(name) = patch.name {
+        host.name = name;
+    }
+    if let Some(address) = patch.address {
+        host.address = address;
+    }
+    if let Some(port) = patch.port {
+        host.port = port;
+    }
+    if let Some(auth) = patch.auth {
+        host.auth = auth;
+    }
+    if let Some(refresh_interval_ms) = patch.refresh_interval_ms {
+        host.refresh_interval_ms = refresh_interval_ms;
+    }
+    if let Some(tags) = patch.tags {
+        host.tags = tags;
     }
 }
 

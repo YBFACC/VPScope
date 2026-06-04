@@ -223,11 +223,19 @@ impl OpenSshClient {
 
     fn session_signature(host: &HostConfig) -> String {
         let auth = match &host.auth {
-            HostAuth::Password { username, .. } => format!("password:{username}"),
+            HostAuth::Password {
+                username,
+                password_ref,
+                ..
+            } => format!(
+                "password:{username}:{}",
+                password_ref.as_deref().unwrap_or_default()
+            ),
             HostAuth::PrivateKey {
                 username,
                 key_path,
                 key_ref,
+                passphrase: _,
                 passphrase_ref,
             } => format!(
                 "private_key:{username}:{}:{}:{}",

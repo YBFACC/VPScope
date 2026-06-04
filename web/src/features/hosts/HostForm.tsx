@@ -25,7 +25,9 @@ export function HostForm({ open, onClose }: HostFormProps) {
   const [username, setUsername] = useState("");
   const [port, setPort] = useState(22);
   const [authType, setAuthType] = useState<HostAuth["type"]>("ssh_agent");
+  const [password, setPassword] = useState("");
   const [keyPath, setKeyPath] = useState("~/.ssh/id_ed25519");
+  const [passphrase, setPassphrase] = useState("");
   const [refreshIntervalMs, setRefreshIntervalMs] = useState(2_000);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<string>();
@@ -57,9 +59,18 @@ export function HostForm({ open, onClose }: HostFormProps) {
     tags: ["ssh"],
     auth:
       authType === "private_key"
-        ? { type: "private_key", username: username.trim(), keyPath }
+        ? {
+            type: "private_key",
+            username: username.trim(),
+            keyPath,
+            passphrase: passphrase || undefined,
+          }
         : authType === "password"
-          ? { type: "password", username: username.trim() }
+          ? {
+              type: "password",
+              username: username.trim(),
+              password: password || undefined,
+            }
           : { type: "ssh_agent", username: username.trim() },
   });
 
@@ -80,7 +91,9 @@ export function HostForm({ open, onClose }: HostFormProps) {
     setUsername(item.user ?? "");
     setPort(item.port);
     setAuthType("ssh_agent");
+    setPassword("");
     setKeyPath(item.identityFile ?? "");
+    setPassphrase("");
   }
 
   async function onTest() {
@@ -190,7 +203,13 @@ export function HostForm({ open, onClose }: HostFormProps) {
           </select>
         </div>
         {authType === "private_key" ? (
-          <input className={inputClass} value={keyPath} onChange={(event) => setKeyPath(event.target.value)} aria-label={t("identityFile")} placeholder={t("identityFile")} />
+          <div className="grid min-w-0 grid-cols-2 gap-2">
+            <input className={inputClass} value={keyPath} onChange={(event) => setKeyPath(event.target.value)} aria-label={t("identityFile")} placeholder={t("identityFile")} />
+            <input className={inputClass} value={passphrase} onChange={(event) => setPassphrase(event.target.value)} aria-label={t("passphrase")} placeholder={t("passphrase")} type="password" autoComplete="new-password" />
+          </div>
+        ) : null}
+        {authType === "password" ? (
+          <input className={inputClass} value={password} onChange={(event) => setPassword(event.target.value)} aria-label={t("password")} placeholder={t("password")} type="password" autoComplete="new-password" />
         ) : null}
         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2">
           <select
