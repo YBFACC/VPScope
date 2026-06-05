@@ -333,24 +333,33 @@ export type VPScopeTheme = {
 - 组件都能用 mock 数据独立渲染。
 - 组件没有直接耦合 Tauri client。
 
-### Step 8: 实现 Host 管理
+### Step 8: 实现 Host Profile 管理
 
 Host 管理界面包含：
 
 - Host 列表。
-- 新增 Host 表单。
+- 新增 Host Profile 弹窗。
 - 编辑 Host 表单。
 - 测试连接按钮。
 - 连接状态提示。
 
-表单字段：
+新增主路径：
+
+- 默认展示从 `~/.ssh/config` 只读导入的 `Host` 列表。
+- 选择 alias 后保存长期可复用 SSH profile。
+- 导入保存时 `name = alias`，`address = alias`，认证方式为 `ssh_agent`，以复用系统 OpenSSH alias、`ssh-agent` 和 Keychain 行为。
+- 如果导入条目缺少 `User`，允许用户在保存前补齐用户名。
+- VPScope 不自动写入或修改用户的 `~/.ssh/config`。
+
+高级手动兜底字段：
 
 - 名称
 - 地址
 - 端口，默认 22
 - 用户名
-- 认证方式：password/private key/ssh-agent
-- password 或 key path
+- 认证方式：ssh-agent/password/private key
+- password 只在用户选择 password auth 时显示
+- key path 和 passphrase 只在用户选择 private key auth 时显示
 - refresh interval
 - tags
 
@@ -360,10 +369,13 @@ Host 管理界面包含：
 - 测试连接时显示 loading。
 - host key unknown 时打开确认弹窗，展示 fingerprint。
 - 保存成功后自动选中新 host。
+- password 和 private key passphrase 文案必须说明它们会写入 macOS Keychain，普通配置只保存 credential ref。
 
 验收：
 
-- 使用 mock client 时可以完整走新增、测试、保存、选中的流程。
+- 使用 mock client 时可以完整走 SSH config 导入、测试、保存、选中的流程。
+- 无 SSH config 条目时可以进入高级手动配置。
+- 高级手动配置仍可创建 password/private key profile，且只在对应认证方式下展示 secret 输入项。
 
 ### Step 9: 接入实时指标
 

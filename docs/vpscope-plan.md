@@ -121,7 +121,13 @@ src-tauri/
 
 ### 第一阶段：Agentless SSH
 
-用户配置 VPS：
+用户保存 VPS SSH profile：
+
+- 首选路径是只读导入 `~/.ssh/config` 中已有 `Host` alias。
+- 导入后保存 `name = alias`、`address = alias`，认证方式为 `ssh_agent`，优先复用系统 OpenSSH alias、`ssh-agent`、Keychain 和用户已有 SSH 配置。
+- VPScope 不自动写入或修改用户的 `~/.ssh/config`；后续如果支持写入，必须单独设计确认、备份和冲突处理策略。
+
+高级手动兜底配置：
 
 - host
 - port
@@ -359,9 +365,10 @@ SSH 和系统命令是本项目的主要风险点。
 - 前端只能调用受控 Tauri command。
 - Tauri capability 只开放必要命令。
 - Rust 层维护命令白名单。
-- 用户凭据存 macOS Keychain，不落普通配置文件。
+- 默认复用系统 SSH/Keychain；只有用户显式选择 app-managed password 或 private key passphrase 时，凭据才存 macOS Keychain，不落普通配置文件。
 - MVP 当前通过 Rust `keyring` 的 Apple native backend 写入 macOS Keychain；host 配置文件只保存 `vpscope://credential/{host_id}/password` 或 `vpscope://credential/{host_id}/passphrase` 引用。
 - private key passphrase 不写日志。
+- `~/.ssh/config` 只读导入，不读取私钥内容，不自动改写用户 SSH 配置。
 - known_hosts 默认严格校验，首次连接需要用户确认 fingerprint。
 - 所有远程命令只读，危险操作不进入 MVP。
 - 日志默认脱敏 host、username、token、key path。
@@ -418,8 +425,8 @@ alert_settings_update
 
 - macOS Tauri app scaffold。
 - React + Tailwind CSS + theme token 系统。
-- Host 管理：新增、编辑、删除、测试 SSH。
-- SSH password/private key 登录。
+- Host 管理：导入 `~/.ssh/config` alias 保存长期 SSH profile、编辑、删除、测试 SSH。
+- SSH config/ssh-agent 主路径，password/private key passphrase 作为 app-managed Keychain 高级兜底。
 - 单 host 实时 dashboard。
 - CPU、内存、磁盘、网络、进程列表。
 - 主题切换：至少 2 个内置 theme。

@@ -31,11 +31,16 @@
 
 ## 手工联调
 
-- [ ] 新增 host。
-- [ ] 新增 password auth host 后，确认 `hosts.json` 只包含 `passwordRef`，Keychain 中存在 `com.vpscope.credentials` 对应 entry。
-- [ ] 新增 private key passphrase host 后，确认 `hosts.json` 只包含 `passphraseRef`，Keychain 中存在对应 entry。
+- [ ] 新增主机弹窗第一屏展示 `~/.ssh/config` 可导入 Host 列表。
+- [ ] 选择 SSH config alias 后，测试连接使用 `ssh_agent`，保存后 `name = alias`、`address = alias`。
+- [ ] 保存 SSH config profile 后，选择该主机进入监控，确认复用系统 SSH alias 行为。
+- [ ] 无可导入 SSH config 条目时，弹窗提示进入高级手动配置。
+- [ ] SSH config 条目缺少 `User` 时，允许用户补齐用户名后再测试和保存。
+- [ ] 高级手动配置新增 password auth host 后，确认 `hosts.json` 只包含 `passwordRef`，Keychain 中存在 `com.vpscope.credentials` 对应 entry。
+- [ ] 高级手动配置新增 private key passphrase host 后，确认 `hosts.json` 只包含 `passphraseRef`，Keychain 中存在对应 entry。
 - [ ] 更新 host 且不填写新 secret 时，确认旧 `passwordRef` / `passphraseRef` 保留。
 - [ ] 切换认证类型或删除 host 后，确认不再使用的 Keychain 凭据被清理。
+- [ ] 重复 host 保存被基础校验拦截。
 - [ ] 测试连接。
 - [ ] 首次连接确认 fingerprint。
 - [ ] Dashboard 连续观察 5 分钟。
