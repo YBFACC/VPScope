@@ -90,6 +90,8 @@ pub fn host_delete(
         .or(id)
         .ok_or_else(|| AppError::config_invalid("Host id is required"))?;
     state.config_store.delete_host(&id)?;
+    state.metrics_scheduler.remove_host_runtime(&id)?;
+    state.ssh_pool.client().disconnect_host(&id)?;
     state
         .tray_state
         .set_settings(state.config_store.get_tray_settings()?);

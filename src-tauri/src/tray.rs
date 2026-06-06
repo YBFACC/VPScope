@@ -74,6 +74,17 @@ impl TrayState {
             .insert(snapshot.host_id.clone(), snapshot.clone());
         inner.apply_snapshot(snapshot);
     }
+
+    pub fn remove_host_snapshot(&self, host_id: &str) {
+        let Ok(mut inner) = self.inner.lock() else {
+            return;
+        };
+
+        inner.snapshots.remove(host_id);
+        if let Some(item) = inner.items.get(host_id) {
+            item.apply_waiting_display();
+        }
+    }
 }
 
 impl TrayInner {

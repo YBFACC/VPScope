@@ -37,6 +37,7 @@ type MetricsStore = {
   subscribeToHosts: (hostIds: HostId[], profile?: CollectionProfile) => Promise<void>;
   clearSubscription: () => Promise<void>;
   clearOverviewSubscriptions: () => Promise<void>;
+  clearMetricsError: (hostId: HostId) => void;
   ingestSnapshot: (snapshot: HostSnapshot, profile: CollectionProfile) => void;
   ingestMetricsError: (event: MetricsErrorEvent) => void;
   removeHostData: (hostId: HostId) => Promise<void>;
@@ -319,6 +320,15 @@ export const useMetricsStore = create<MetricsStore>((set, get) => ({
         isSubscribing: current.activeHostId === hostId ? false : current.isSubscribing,
       };
     });
+  },
+  clearMetricsError(hostId) {
+    set((state) => ({
+      error: state.error === state.errorsByHost[hostId] ? undefined : state.error,
+      errorsByHost: {
+        ...state.errorsByHost,
+        [hostId]: undefined,
+      },
+    }));
   },
   ingestSnapshot(snapshot, profile) {
     set((state) => {

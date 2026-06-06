@@ -29,12 +29,15 @@ export function HostForm({ open, onClose }: HostFormProps) {
   const [keyPath, setKeyPath] = useState("~/.ssh/id_ed25519");
   const [refreshIntervalMs, setRefreshIntervalMs] = useState(2_000);
   const [isSaving, setIsSaving] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
+  const [isAcceptingHostKey, setIsAcceptingHostKey] = useState(false);
   const [message, setMessage] = useState<string>();
   const [pendingHostKey, setPendingHostKey] = useState<{
     payload: HostTestConnectionPayload;
     fingerprint: string;
   }>();
   const selectedConfigHost = sshConfigHosts.find((host) => host.alias === selectedConfigAlias);
+  const isBusy = isSaving || isTesting || isAcceptingHostKey;
 
   useEffect(() => {
     if (!open) {
@@ -50,6 +53,9 @@ export function HostForm({ open, onClose }: HostFormProps) {
     setAuthType("ssh_agent");
     setKeyPath("~/.ssh/id_ed25519");
     setRefreshIntervalMs(2_000);
+    setIsSaving(false);
+    setIsTesting(false);
+    setIsAcceptingHostKey(false);
     setSshConfigHosts([]);
     setIsLoadingSshConfig(true);
     setMessage(undefined);
@@ -118,8 +124,13 @@ export function HostForm({ open, onClose }: HostFormProps) {
   }
 
   async function onTest() {
+    if (isBusy) {
+      return;
+    }
+
     const draft = payload();
     const testPayload = { draft };
+    setIsTesting(true);
     setMessage(t("testing"));
     setPendingHostKey(undefined);
     try {
@@ -142,14 +153,17 @@ export function HostForm({ open, onClose }: HostFormProps) {
       }
 
       setMessage(appError.message);
+    } finally {
+      setIsTesting(false);
     }
   }
 
   async function onAcceptHostKey() {
-    if (!pendingHostKey) {
+    if (!pendingHostKey || isBusy) {
       return;
     }
 
+    setIsAcceptingHostKey(true);
     setMessage(t("acceptingHostKey"));
     try {
       await runClient(() =>
@@ -164,6 +178,8 @@ export function HostForm({ open, onClose }: HostFormProps) {
     } catch (error) {
       const appError = error as AppError;
       setMessage(appError.code === "SSH_HOST_KEY_CHANGED" ? t("hostKeyChanged") : appError.message);
+    } finally {
+      setIsAcceptingHostKey(false);
     }
   }
 
@@ -188,10 +204,14 @@ export function HostForm({ open, onClose }: HostFormProps) {
     }
 
     setIsSaving(true);
+    setMessage(t("saving"));
     try {
       await createHost(payload());
       setMessage(t("hostSaved"));
       onClose();
+    } catch (error) {
+      const appError = error as AppError;
+      setMessage(appError.message);
     } finally {
       setIsSaving(false);
     }
@@ -212,7 +232,7 @@ export function HostForm({ open, onClose }: HostFormProps) {
             <span className="pixel-dot mr-2 text-[var(--color-accent)]" />
             {t("addHost")}
           </h2>
-          <button type="button" onClick={onClose} className="control-button">
+          <button type="button" onClick={onClose} className="control-button" disabled={isBusy}>
             {t("close")}
           </button>
         </div>
@@ -221,6 +241,7 @@ export function HostForm({ open, onClose }: HostFormProps) {
           <button
             type="button"
             onClick={() => setMode("sshConfig")}
+            disabled={isBusy}
             className="h-8 rounded-[var(--radius-control)] border border-transparent text-[11px] uppercase text-[var(--color-text-muted)] data-[active=true]:border-[var(--color-border-strong)] data-[active=true]:bg-[var(--color-panel-muted)] data-[active=true]:text-[var(--color-accent)]"
             data-active={mode === "sshConfig"}
           >
@@ -229,6 +250,7 @@ export function HostForm({ open, onClose }: HostFormProps) {
           <button
             type="button"
             onClick={() => setMode("manual")}
+            disabled={isBusy}
             className="h-8 rounded-[var(--radius-control)] border border-transparent text-[11px] uppercase text-[var(--color-text-muted)] data-[active=true]:border-[var(--color-border-strong)] data-[active=true]:bg-[var(--color-panel-muted)] data-[active=true]:text-[var(--color-accent)]"
             data-active={mode === "manual"}
           >
@@ -250,7 +272,7 @@ export function HostForm({ open, onClose }: HostFormProps) {
               <div className="grid gap-2 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-input)] p-3 text-xs text-[var(--color-text-muted)]">
                 <span>{t("noSshConfigHosts")}</span>
                 <span className="text-[11px] leading-4">{t("noSshConfigHostsMessage")}</span>
-                <button type="button" onClick={() => setMode("manual")} className="control-button justify-self-start">
+                <button type="button" onClick={() => setMode("manual")} className="control-button justify-self-start" disabled={isBusy}>
                   {t("advancedManual")}
                 </button>
               </div>
@@ -261,6 +283,7 @@ export function HostForm({ open, onClose }: HostFormProps) {
                     key={host.alias}
                     type="button"
                     onClick={() => applySshConfigHost(host.alias)}
+                    disabled={isBusy}
                     className="grid min-h-11 min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] px-2 py-1 text-left text-[11px] uppercase text-[var(--color-text-muted)] data-[active=true]:border-[var(--color-border-strong)] data-[active=true]:bg-[var(--color-panel-muted)] data-[active=true]:text-[var(--color-text)]"
                     data-active={selectedConfigAlias === host.alias}
                   >
@@ -305,23 +328,23 @@ export function HostForm({ open, onClose }: HostFormProps) {
         ) : null}
 
         <div className="grid min-w-0 grid-cols-2 gap-2">
-          <input className={inputClass} value={name} onChange={(event) => setName(event.target.value)} aria-label={t("hostName")} placeholder={t("hostName")} />
-          <input className={inputClass} value={address} onChange={(event) => setAddress(event.target.value)} aria-label={t("address")} placeholder={t("address")} />
+          <input className={inputClass} value={name} onChange={(event) => setName(event.target.value)} aria-label={t("hostName")} placeholder={t("hostName")} disabled={isBusy} />
+          <input className={inputClass} value={address} onChange={(event) => setAddress(event.target.value)} aria-label={t("address")} placeholder={t("address")} disabled={isBusy} />
         </div>
         {mode === "sshConfig" ? (
           <p className="truncate text-[10px] uppercase text-[var(--color-text-muted)]">{t("sshConfigAddressAliasHint")}</p>
         ) : null}
         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_96px_minmax(104px,136px)] gap-2">
-          <input className={inputClass} value={username} onChange={(event) => setUsername(event.target.value)} aria-label={t("user")} placeholder={t("user")} />
-          <input className={inputClass} value={port} min={1} max={65535} type="number" onChange={(event) => setPort(Number(event.target.value))} aria-label={t("port")} />
-          <select className={inputClass} value={authType} onChange={(event) => setAuthType(event.target.value as HostAuth["type"])}>
+          <input className={inputClass} value={username} onChange={(event) => setUsername(event.target.value)} aria-label={t("user")} placeholder={t("user")} disabled={isBusy} />
+          <input className={inputClass} value={port} min={1} max={65535} type="number" onChange={(event) => setPort(Number(event.target.value))} aria-label={t("port")} disabled={isBusy} />
+          <select className={inputClass} value={authType} onChange={(event) => setAuthType(event.target.value as HostAuth["type"])} disabled={isBusy}>
             <option value="ssh_agent">{t("authAgent")}</option>
             <option value="private_key">{t("authKey")}</option>
           </select>
         </div>
         {authType === "private_key" ? (
           <div className="grid gap-1">
-            <input className={inputClass} value={keyPath} onChange={(event) => setKeyPath(event.target.value)} aria-label={t("identityFile")} placeholder={t("identityFile")} />
+            <input className={inputClass} value={keyPath} onChange={(event) => setKeyPath(event.target.value)} aria-label={t("identityFile")} placeholder={t("identityFile")} disabled={isBusy} />
             <p className="truncate text-[10px] uppercase text-[var(--color-text-muted)]">{t("passwordlessKeyHint")}</p>
           </div>
         ) : null}
@@ -331,16 +354,17 @@ export function HostForm({ open, onClose }: HostFormProps) {
             value={refreshIntervalMs}
             onChange={(event) => setRefreshIntervalMs(Number(event.target.value))}
             aria-label="Refresh interval"
+            disabled={isBusy}
           >
             <option value={1000}>1000ms</option>
             <option value={2000}>2000ms</option>
             <option value={5000}>5000ms</option>
           </select>
-          <button type="button" onClick={onTest} className="control-button min-w-0 px-3">
-            {t("test")}
+          <button type="button" onClick={onTest} className="control-button min-w-0 px-3" disabled={isBusy}>
+            <ButtonLabel loading={isTesting} label={isTesting ? t("testing") : t("test")} />
           </button>
-          <button type="submit" className="control-button min-w-0 px-3" disabled={isSaving}>
-            {t("saveSshProfile")}
+          <button type="submit" className="control-button min-w-0 px-3" disabled={isBusy}>
+            <ButtonLabel loading={isSaving} label={isSaving ? t("saving") : t("saveSshProfile")} />
           </button>
         </div>
         {pendingHostKey ? (
@@ -351,17 +375,31 @@ export function HostForm({ open, onClose }: HostFormProps) {
               {pendingHostKey.fingerprint}
             </code>
             <div className="flex justify-end gap-2">
-              <button type="button" onClick={() => setPendingHostKey(undefined)} className="control-button">
+              <button type="button" onClick={() => setPendingHostKey(undefined)} className="control-button" disabled={isBusy}>
                 {t("cancel")}
               </button>
-              <button type="button" onClick={onAcceptHostKey} className="control-button">
-                {t("trustHostKey")}
+              <button type="button" onClick={onAcceptHostKey} className="control-button" disabled={isBusy}>
+                <ButtonLabel loading={isAcceptingHostKey} label={isAcceptingHostKey ? t("requesting") : t("trustHostKey")} />
               </button>
             </div>
           </div>
         ) : null}
-        {message ? <p className="truncate text-[11px] uppercase text-[var(--color-text-muted)]">{message}</p> : null}
+        {message ? (
+          <p className="flex min-h-4 min-w-0 items-center gap-2 truncate text-[11px] uppercase text-[var(--color-text-muted)]">
+            {isBusy ? <span className="host-icon-loading shrink-0" /> : null}
+            <span className="truncate">{message}</span>
+          </p>
+        ) : null}
       </form>
     </div>
+  );
+}
+
+function ButtonLabel({ loading, label }: { loading: boolean; label: string }) {
+  return (
+    <span className="inline-flex min-w-0 items-center justify-center gap-2">
+      {loading ? <span className="host-icon-loading shrink-0" /> : null}
+      <span className="truncate">{label}</span>
+    </span>
   );
 }

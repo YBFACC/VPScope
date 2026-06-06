@@ -240,14 +240,19 @@ impl OpenSshClient {
             Err(error) => {
                 let app_error = map_openssh_connect_error(error);
                 if app_error.code == AppErrorCode::SshHostKeyUnknown.as_str() {
-                    return Err(match scan_host_key_fingerprint(host) {
-                        Ok(fingerprint) => app_error.with_fingerprint(fingerprint),
-                        Err(scan_error) => {
-                            let detail =
-                                app_error.detail.as_deref().unwrap_or_default().to_string();
-                            app_error.with_detail(format!("{detail}; fingerprintScan={scan_error}"))
-                        }
-                    });
+                    return Err(
+                        match scan_host_key_fingerprints(host)
+                            .and_then(|fingerprints| preferred_host_key_fingerprint(&fingerprints))
+                        {
+                            Ok(fingerprint) => app_error.with_fingerprint(fingerprint),
+                            Err(scan_error) => {
+                                let detail =
+                                    app_error.detail.as_deref().unwrap_or_default().to_string();
+                                app_error
+                                    .with_detail(format!("{detail}; fingerprintScan={scan_error}"))
+                            }
+                        },
+                    );
                 }
 
                 Err(app_error)
@@ -329,13 +334,13 @@ impl OpenSshClient {
         host: &HostConfig,
         expected_fingerprint: &str,
     ) -> Result<String, AppError> {
-        let fingerprint = scan_host_key_fingerprint(host)?;
-        validate_expected_fingerprint(&fingerprint, expected_fingerprint)?;
+        let fingerprints = scan_host_key_fingerprints(host)?;
+        validate_expected_fingerprint(&fingerprints, expected_fingerprint)?;
 
         let session = Self::connect(host, KnownHosts::Add).await?;
         drop(session);
         self.drop_cached_session(&host.id)?;
-        Ok(fingerprint)
+        Ok(expected_fingerprint.to_string())
     }
 
     async fn exec_program(
@@ -525,7 +530,7 @@ fn should_retry_with_fresh_session(error: &AppError) -> bool {
     error.code == AppErrorCode::SshConnectFailed.as_str()
 }
 
-fn scan_host_key_fingerprint(host: &HostConfig) -> Result<String, AppError> {
+fn scan_host_key_fingerprints(host: &HostConfig) -> Result<Vec<HostKeyFingerprint>, AppError> {
     let target = resolve_keyscan_target(host)?;
     let keyscan = Command::new("/usr/bin/ssh-keyscan")
         .arg("-T")
@@ -550,7 +555,13 @@ fn scan_host_key_fingerprint(host: &HostConfig) -> Result<String, AppError> {
         .with_detail(String::from_utf8_lossy(&keyscan.stderr).trim().to_string()));
     }
 
-    fingerprint_from_known_host_entry(&keyscan.stdout)
+    fingerprints_from_known_host_entry(&keyscan.stdout)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct HostKeyFingerprint {
+    algorithm: Option<String>,
+    fingerprint: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -614,7 +625,7 @@ fn ssh_config_value<'a>(config: &'a str, key: &str) -> Option<&'a str> {
     })
 }
 
-fn fingerprint_from_known_host_entry(input: &[u8]) -> Result<String, AppError> {
+fn fingerprints_from_known_host_entry(input: &[u8]) -> Result<Vec<HostKeyFingerprint>, AppError> {
     let mut child = Command::new("/usr/bin/ssh-keygen")
         .arg("-l")
         .arg("-E")
@@ -659,31 +670,77 @@ fn fingerprint_from_known_host_entry(input: &[u8]) -> Result<String, AppError> {
         .with_detail(String::from_utf8_lossy(&output.stderr).trim().to_string()));
     }
 
-    parse_ssh_keygen_fingerprint(&String::from_utf8_lossy(&output.stdout)).ok_or_else(|| {
-        AppError::new(
+    let fingerprints = parse_ssh_keygen_fingerprints(&String::from_utf8_lossy(&output.stdout));
+    if fingerprints.is_empty() {
+        return Err(AppError::new(
             AppErrorCode::SshHostKeyUnknown,
             "ssh-keygen did not return a SHA256 host key fingerprint",
-        )
-    })
+        ));
+    }
+
+    Ok(fingerprints)
 }
 
-fn parse_ssh_keygen_fingerprint(output: &str) -> Option<String> {
+fn parse_ssh_keygen_fingerprints(output: &str) -> Vec<HostKeyFingerprint> {
     output
-        .split_whitespace()
-        .find(|part| part.starts_with("SHA256:"))
-        .map(str::to_string)
+        .lines()
+        .filter_map(|line| {
+            let fingerprint = line
+                .split_whitespace()
+                .find(|part| part.starts_with("SHA256:"))?
+                .to_string();
+            let algorithm = line
+                .rsplit_once('(')
+                .and_then(|(_, value)| value.strip_suffix(')'))
+                .map(|value| value.to_ascii_lowercase());
+
+            Some(HostKeyFingerprint {
+                algorithm,
+                fingerprint,
+            })
+        })
+        .collect()
 }
 
-fn validate_expected_fingerprint(scanned: &str, expected: &str) -> Result<(), AppError> {
-    if scanned == expected {
+fn preferred_host_key_fingerprint(fingerprints: &[HostKeyFingerprint]) -> Result<String, AppError> {
+    ["ed25519", "ecdsa", "rsa"]
+        .iter()
+        .find_map(|preferred| {
+            fingerprints
+                .iter()
+                .find(|key| {
+                    key.algorithm
+                        .as_deref()
+                        .map(|algorithm| algorithm.contains(preferred))
+                        .unwrap_or(false)
+                })
+                .map(|key| key.fingerprint.clone())
+        })
+        .or_else(|| fingerprints.first().map(|key| key.fingerprint.clone()))
+        .ok_or_else(|| {
+            AppError::new(
+                AppErrorCode::SshHostKeyUnknown,
+                "ssh-keygen did not return a SHA256 host key fingerprint",
+            )
+        })
+}
+
+fn validate_expected_fingerprint(
+    scanned: &[HostKeyFingerprint],
+    expected: &str,
+) -> Result<(), AppError> {
+    if scanned.iter().any(|key| key.fingerprint == expected) {
         return Ok(());
     }
+
+    let scanned_fingerprint =
+        preferred_host_key_fingerprint(scanned).unwrap_or_else(|_| "SHA256:unknown".to_string());
 
     Err(AppError::new(
         AppErrorCode::SshHostKeyChanged,
         "SSH host key fingerprint changed before confirmation",
     )
-    .with_fingerprint(scanned.to_string()))
+    .with_fingerprint(scanned_fingerprint))
 }
 
 const FAST_METRICS_SCRIPT: &str = r#"
@@ -1019,20 +1076,82 @@ __VPSCOPE_SECTION:diskstats__
     }
 
     #[test]
-    fn parses_sha256_fingerprint_from_ssh_keygen_output() {
+    fn parses_sha256_fingerprints_from_ssh_keygen_output() {
         assert_eq!(
-            parse_ssh_keygen_fingerprint("256 SHA256:abc123 host.example.com (ED25519)\n"),
-            Some("SHA256:abc123".to_string())
+            parse_ssh_keygen_fingerprints(
+                "256 SHA256:abc123 host.example.com (ED25519)\n\
+                 256 SHA256:def456 host.example.com (ECDSA)\n"
+            ),
+            vec![
+                HostKeyFingerprint {
+                    algorithm: Some("ed25519".to_string()),
+                    fingerprint: "SHA256:abc123".to_string(),
+                },
+                HostKeyFingerprint {
+                    algorithm: Some("ecdsa".to_string()),
+                    fingerprint: "SHA256:def456".to_string(),
+                },
+            ]
         );
     }
 
     #[test]
     fn rejects_host_key_confirmation_when_fingerprint_changes() {
-        let error = validate_expected_fingerprint("SHA256:new", "SHA256:old")
-            .expect_err("changed fingerprint must fail");
+        let error = validate_expected_fingerprint(
+            &[HostKeyFingerprint {
+                algorithm: Some("ed25519".to_string()),
+                fingerprint: "SHA256:new".to_string(),
+            }],
+            "SHA256:old",
+        )
+        .expect_err("changed fingerprint must fail");
 
         assert_eq!(error.code, "SSH_HOST_KEY_CHANGED");
         assert_eq!(error.fingerprint.as_deref(), Some("SHA256:new"));
+    }
+
+    #[test]
+    fn accepts_host_key_confirmation_when_expected_fingerprint_is_in_any_scanned_key() {
+        let reordered_scan = vec![
+            HostKeyFingerprint {
+                algorithm: Some("rsa".to_string()),
+                fingerprint: "SHA256:rsa".to_string(),
+            },
+            HostKeyFingerprint {
+                algorithm: Some("ed25519".to_string()),
+                fingerprint: "SHA256:ed25519".to_string(),
+            },
+            HostKeyFingerprint {
+                algorithm: Some("ecdsa".to_string()),
+                fingerprint: "SHA256:ecdsa".to_string(),
+            },
+        ];
+
+        validate_expected_fingerprint(&reordered_scan, "SHA256:ed25519")
+            .expect("matching fingerprint must be accepted regardless of scan order");
+    }
+
+    #[test]
+    fn prefers_stable_host_key_algorithm_for_display() {
+        let fingerprints = vec![
+            HostKeyFingerprint {
+                algorithm: Some("rsa".to_string()),
+                fingerprint: "SHA256:rsa".to_string(),
+            },
+            HostKeyFingerprint {
+                algorithm: Some("ecdsa".to_string()),
+                fingerprint: "SHA256:ecdsa".to_string(),
+            },
+            HostKeyFingerprint {
+                algorithm: Some("ed25519".to_string()),
+                fingerprint: "SHA256:ed25519".to_string(),
+            },
+        ];
+
+        assert_eq!(
+            preferred_host_key_fingerprint(&fingerprints).unwrap(),
+            "SHA256:ed25519"
+        );
     }
 
     #[tokio::test]

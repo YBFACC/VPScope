@@ -116,6 +116,40 @@ impl MetricsScheduler {
         Ok(None)
     }
 
+    pub fn remove_host_runtime(&self, host_id: &str) -> Result<usize, AppError> {
+        let removed_subscriptions = {
+            let mut subscriptions = self
+                .subscriptions
+                .write()
+                .map_err(|_| AppError::internal("Metrics scheduler lock is poisoned"))?;
+
+            let subscription_ids = subscriptions
+                .iter()
+                .filter_map(|(subscription_id, subscription)| {
+                    (subscription.host_id == host_id).then(|| subscription_id.clone())
+                })
+                .collect::<Vec<_>>();
+
+            subscription_ids
+                .into_iter()
+                .filter_map(|subscription_id| subscriptions.remove(&subscription_id))
+                .collect::<Vec<_>>()
+        };
+
+        for subscription in &removed_subscriptions {
+            subscription.handle.abort();
+        }
+
+        self.cancel_idle_disconnect(host_id)?;
+        self.snapshots
+            .write()
+            .map_err(|_| AppError::internal("Metrics snapshot cache lock is poisoned"))?
+            .remove(host_id);
+        self.tray_state.remove_host_snapshot(host_id);
+
+        Ok(removed_subscriptions.len())
+    }
+
     pub fn latest_snapshot(&self, host_id: &str) -> Result<Option<HostSnapshot>, AppError> {
         Ok(self
             .snapshots
@@ -287,4 +321,86 @@ async fn run_subscription_loop(
 
 fn emit_connection_state(app: &AppHandle, state: HostConnectionState) {
     let _ = app.emit(HOST_CONNECTION_STATE, state);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        config::{HostAuth, HostConfig, TraySettings},
+        metrics::collector::MetricsCollector,
+    };
+    use std::future;
+
+    fn host(id: &str) -> HostConfig {
+        HostConfig {
+            id: id.to_string(),
+            name: id.to_string(),
+            address: "203.0.113.10".to_string(),
+            port: 22,
+            auth: HostAuth::SshAgent {
+                username: "ubuntu".to_string(),
+            },
+            refresh_interval_ms: 2_000,
+            tags: Vec::new(),
+            created_at: 1,
+            updated_at: 1,
+        }
+    }
+
+    fn insert_subscription(scheduler: &MetricsScheduler, subscription_id: &str, host_id: &str) {
+        let handle = async_runtime::spawn(async {
+            future::pending::<()>().await;
+        });
+        scheduler
+            .subscriptions
+            .write()
+            .expect("subscriptions lock")
+            .insert(
+                subscription_id.to_string(),
+                SubscriptionTask {
+                    host_id: host_id.to_string(),
+                    handle,
+                },
+            );
+    }
+
+    #[tokio::test]
+    async fn remove_host_runtime_aborts_only_deleted_host_subscriptions_and_clears_snapshot() {
+        let tray_state = Arc::new(TrayState::new(TraySettings::default()));
+        let scheduler = MetricsScheduler::new(tray_state);
+
+        insert_subscription(&scheduler, "deleted-active", "deleted-host");
+        insert_subscription(&scheduler, "deleted-tray", "deleted-host");
+        insert_subscription(&scheduler, "kept-overview", "kept-host");
+
+        scheduler.snapshots.write().expect("snapshot lock").insert(
+            "deleted-host".to_string(),
+            MetricsCollector::warming_snapshot(&host("deleted-host"), 1),
+        );
+        scheduler.snapshots.write().expect("snapshot lock").insert(
+            "kept-host".to_string(),
+            MetricsCollector::warming_snapshot(&host("kept-host"), 1),
+        );
+
+        let removed = scheduler
+            .remove_host_runtime("deleted-host")
+            .expect("remove runtime");
+
+        assert_eq!(removed, 2);
+        assert!(scheduler
+            .subscriptions
+            .read()
+            .expect("subscriptions lock")
+            .values()
+            .all(|subscription| subscription.host_id != "deleted-host"));
+        assert!(scheduler.latest_snapshot("deleted-host").unwrap().is_none());
+        assert!(scheduler.latest_snapshot("kept-host").unwrap().is_some());
+        assert!(scheduler
+            .subscriptions
+            .read()
+            .expect("subscriptions lock")
+            .values()
+            .any(|subscription| subscription.host_id == "kept-host"));
+    }
 }

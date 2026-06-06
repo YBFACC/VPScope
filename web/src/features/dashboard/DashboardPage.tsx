@@ -22,6 +22,7 @@ import { DiskPanel } from "./DiskPanel";
 import { MemoryPanel } from "./MemoryPanel";
 import { NetworkPanel } from "./NetworkPanel";
 import { ProcessPanel } from "./ProcessPanel";
+import type { AppError } from "@/types/contracts";
 
 export function DashboardPage() {
   const [isWindowVisible, setIsWindowVisible] = useState(
@@ -45,6 +46,7 @@ export function DashboardPage() {
   const subscribeToHosts = useMetricsStore((state) => state.subscribeToHosts);
   const clearSubscription = useMetricsStore((state) => state.clearSubscription);
   const clearOverviewSubscriptions = useMetricsStore((state) => state.clearOverviewSubscriptions);
+  const clearMetricsError = useMetricsStore((state) => state.clearMetricsError);
   const isSubscribing = useMetricsStore((state) => state.isSubscribing);
   const ingestMetricsError = useMetricsStore((state) => state.ingestMetricsError);
   const snapshots = useMetricsStore((state) => state.snapshots);
@@ -77,6 +79,7 @@ export function DashboardPage() {
       : undefined;
   const hostKeyPromptId = hostKeyError?.fingerprint ? `${selectedHostId}:${hostKeyError.fingerprint}` : undefined;
   const showHostKeyPrompt = Boolean(hostKeyError?.fingerprint && hostKeyPromptId !== dismissedHostKey);
+  const retainedSnapshotError = selectedHost && snapshot ? metricsError ?? connection?.lastError : undefined;
 
   useEffect(() => {
     void loadHosts();
@@ -248,7 +251,7 @@ export function DashboardPage() {
   ]);
 
   async function acceptSelectedHostKey() {
-    if (!selectedHostId || !hostKeyError?.fingerprint) {
+    if (!selectedHostId || !hostKeyError?.fingerprint || !hostKeyPromptId) {
       return;
     }
 
@@ -262,6 +265,12 @@ export function DashboardPage() {
         }),
       );
       setDismissedHostKey(undefined);
+      clearMetricsError(selectedHostId);
+      setConnectionState({
+        hostId: selectedHostId,
+        status: "connecting",
+        message: t("connecting"),
+      });
       await subscribeToHost(selectedHostId);
     } catch (error) {
       const appError = error as { code?: string; message?: string };
@@ -353,6 +362,7 @@ export function DashboardPage() {
                 snapshot={snapshot}
                 history={history}
                 processes={processes}
+                retainedSnapshotError={retainedSnapshotError}
               />
             )}
           </section>
@@ -375,6 +385,7 @@ type DashboardPanelsProps = {
   snapshot: NonNullable<ReturnType<typeof useSelectedSnapshot>>;
   history: ReturnType<typeof useSelectedHistory>;
   processes: ReturnType<typeof useSelectedProcesses>;
+  retainedSnapshotError?: AppError;
 };
 
 function panelPercent(usedBytes: number, totalBytes: number) {
@@ -385,6 +396,7 @@ function DashboardPanels({
   snapshot,
   history,
   processes,
+  retainedSnapshotError,
 }: DashboardPanelsProps) {
   const { t } = useI18n();
   const cpuSummary = snapshot.sampleState === "live" ? `${Math.round(snapshot.cpu.totalPercent)}%` : "--";
@@ -435,6 +447,14 @@ function DashboardPanels({
 
   return (
     <div className="dashboard-workspace">
+      {retainedSnapshotError ? (
+        <div className="dashboard-retained-snapshot-bar" role="status">
+          <span>{t("connectionInterrupted")}</span>
+          <strong>{t("preservingLastSnapshot")}</strong>
+          <span>{retainedSnapshotError.message}</span>
+          <span>{t("retrying")}</span>
+        </div>
+      ) : null}
       <div className="dashboard-grid btop-dashboard-grid">
         <div className="btop-slot-cpu">{panelItemById.get("cpu")?.element}</div>
         <div className="btop-resource-grid">
