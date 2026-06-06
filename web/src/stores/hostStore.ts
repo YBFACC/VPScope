@@ -157,17 +157,19 @@ export const useHostStore = create<HostStore>((set, get) => ({
         },
       }));
     } catch (error) {
+      const appError = error as AppError;
       set((state) => ({
         connectionStates: {
           ...state.connectionStates,
           [hostId]: {
             hostId,
             status: "error",
-            message: (error as AppError).message,
-            lastError: error as AppError,
+            message: appError.message,
+            lastError: appError,
           },
         },
       }));
+      throw appError;
     }
   },
   setConnectionState(state) {

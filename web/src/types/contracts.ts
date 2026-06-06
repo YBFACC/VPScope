@@ -14,6 +14,7 @@ export type AppError = {
     | "INTERNAL";
   message: string;
   detail?: string;
+  fingerprint?: string;
   retryable: boolean;
 };
 
@@ -119,6 +120,15 @@ export type HostOpenTerminalResult = {
 export type HostTestConnectionPayload = {
   id?: HostId;
   draft?: HostCreatePayload;
+};
+
+export type HostAcceptKeyPayload = HostTestConnectionPayload & {
+  fingerprint: string;
+};
+
+export type HostAcceptKeyResult = {
+  ok: true;
+  fingerprint: string;
 };
 
 export type HostTestConnectionResult = {
@@ -272,6 +282,7 @@ export type VpscopeCommandPayloads = {
   host_open_terminal: HostOpenTerminalPayload;
   host_ssh_config_list: Record<string, never>;
   host_test_connection: HostTestConnectionPayload;
+  host_accept_key: HostAcceptKeyPayload;
   metrics_last_snapshot: MetricsLastSnapshotPayload;
   metrics_subscribe: MetricsSubscribePayload;
   metrics_unsubscribe: MetricsUnsubscribePayload;
@@ -293,6 +304,7 @@ export type VpscopeCommandResults = {
   host_open_terminal: HostOpenTerminalResult;
   host_ssh_config_list: SshConfigHost[];
   host_test_connection: HostTestConnectionResult;
+  host_accept_key: HostAcceptKeyResult;
   metrics_last_snapshot: MetricsLastSnapshotResult;
   metrics_subscribe: MetricsSubscribeResult;
   metrics_unsubscribe: MetricsUnsubscribeResult;

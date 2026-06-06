@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useI18n } from "@/i18n/useI18n";
 import { runClient, tauriClient } from "@/lib/tauriClient";
 import { useHostStore } from "@/stores/hostStore";
-import type { HostAuth, HostCreatePayload, SshConfigHost } from "@/types/contracts";
+import type { AppError, HostAuth, HostCreatePayload, HostTestConnectionPayload, SshConfigHost } from "@/types/contracts";
 
 const inputClass =
   "h-8 min-w-0 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-input)] px-2 font-mono text-[11px] uppercase text-[var(--color-text)] outline-none focus:border-[var(--color-border-strong)]";
@@ -32,6 +32,10 @@ export function HostForm({ open, onClose }: HostFormProps) {
   const [refreshIntervalMs, setRefreshIntervalMs] = useState(2_000);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<string>();
+  const [pendingHostKey, setPendingHostKey] = useState<{
+    payload: HostTestConnectionPayload;
+    fingerprint: string;
+  }>();
   const selectedConfigHost = sshConfigHosts.find((host) => host.alias === selectedConfigAlias);
 
   useEffect(() => {
@@ -53,6 +57,7 @@ export function HostForm({ open, onClose }: HostFormProps) {
     setSshConfigHosts([]);
     setIsLoadingSshConfig(true);
     setMessage(undefined);
+    setPendingHostKey(undefined);
 
     let active = true;
     void runClient(() => tauriClient.listSshConfigHosts())
@@ -126,9 +131,53 @@ export function HostForm({ open, onClose }: HostFormProps) {
   }
 
   async function onTest() {
+    const draft = payload();
+    const testPayload = { draft };
     setMessage(t("testing"));
-    await testConnection({ draft: payload() });
-    setMessage(t("connectionTestFinished"));
+    setPendingHostKey(undefined);
+    try {
+      await testConnection(testPayload);
+      setMessage(t("connectionTestFinished"));
+    } catch (error) {
+      const appError = error as AppError;
+      if (appError.code === "SSH_HOST_KEY_UNKNOWN" && appError.fingerprint) {
+        setPendingHostKey({
+          payload: testPayload,
+          fingerprint: appError.fingerprint,
+        });
+        setMessage(t("hostKeyUnknown"));
+        return;
+      }
+
+      if (appError.code === "SSH_HOST_KEY_CHANGED") {
+        setMessage(t("hostKeyChanged"));
+        return;
+      }
+
+      setMessage(appError.message);
+    }
+  }
+
+  async function onAcceptHostKey() {
+    if (!pendingHostKey) {
+      return;
+    }
+
+    setMessage(t("acceptingHostKey"));
+    try {
+      await runClient(() =>
+        tauriClient.acceptHostKey({
+          ...pendingHostKey.payload,
+          fingerprint: pendingHostKey.fingerprint,
+        }),
+      );
+      await testConnection(pendingHostKey.payload);
+      setPendingHostKey(undefined);
+      setMessage(t("hostKeyAccepted"));
+    } catch (error) {
+      const appError = error as AppError;
+      setMessage(appError.code === "SSH_HOST_KEY_CHANGED" ? t("hostKeyChanged") : appError.message);
+    }
   }
 
   async function onSubmit(event: React.FormEvent) {
@@ -317,6 +366,23 @@ export function HostForm({ open, onClose }: HostFormProps) {
             {t("saveSshProfile")}
           </button>
         </div>
+        {pendingHostKey ? (
+          <div className="grid gap-2 rounded-[var(--radius-control)] border border-[var(--color-warning)] bg-[var(--color-panel)] p-2 text-[11px] uppercase text-[var(--color-text-muted)]">
+            <p className="text-[var(--color-text)]">{t("hostKeyUnknown")}</p>
+            <p className="leading-4">{t("hostKeyUnknownMessage")}</p>
+            <code className="block overflow-hidden text-ellipsis rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] px-2 py-1 text-[var(--color-accent)]">
+              {pendingHostKey.fingerprint}
+            </code>
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setPendingHostKey(undefined)} className="control-button">
+                {t("cancel")}
+              </button>
+              <button type="button" onClick={onAcceptHostKey} className="control-button">
+                {t("trustHostKey")}
+              </button>
+            </div>
+          </div>
+        ) : null}
         {message ? <p className="truncate text-[11px] uppercase text-[var(--color-text-muted)]">{message}</p> : null}
       </form>
     </div>

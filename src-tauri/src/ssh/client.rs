@@ -7,7 +7,8 @@ use openssh::{KnownHosts, Session, SessionBuilder};
 use serde::Serialize;
 use std::{
     collections::HashMap,
-    io::ErrorKind,
+    io::{ErrorKind, Write},
+    process::{Command, Stdio},
     sync::{Arc, Mutex},
     time::Instant,
 };
@@ -89,6 +90,16 @@ pub struct RemoteMetricsOutput {
 pub trait SshClient: Send + Sync {
     async fn test_connection(&self, host: &HostConfig) -> Result<ConnectionInfo, AppError>;
     async fn exec(&self, host: &HostConfig, command: RemoteCommand) -> Result<String, AppError>;
+    async fn accept_host_key(
+        &self,
+        _host: &HostConfig,
+        _expected_fingerprint: &str,
+    ) -> Result<String, AppError> {
+        Err(AppError::new(
+            AppErrorCode::RemoteUnsupported,
+            "SSH host key confirmation is not supported by this client",
+        ))
+    }
     fn disconnect_host(&self, _host_id: &str) -> Result<(), AppError> {
         Ok(())
     }
@@ -165,6 +176,14 @@ impl SshClient for MockSshClient {
         )
         .with_detail(format!("fixedCommand={}", command.as_fixed_command())))
     }
+
+    async fn accept_host_key(
+        &self,
+        _host: &HostConfig,
+        expected_fingerprint: &str,
+    ) -> Result<String, AppError> {
+        Ok(expected_fingerprint.to_string())
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -183,11 +202,11 @@ impl OpenSshClient {
         Self::default()
     }
 
-    fn builder_for(host: &HostConfig) -> Result<SessionBuilder, AppError> {
+    fn builder_for(host: &HostConfig, known_hosts: KnownHosts) -> Result<SessionBuilder, AppError> {
         let mut builder = SessionBuilder::default();
         builder
             .port(host.port)
-            .known_hosts_check(KnownHosts::Strict)
+            .known_hosts_check(known_hosts)
             .connect_timeout(std::time::Duration::from_secs(8))
             .server_alive_interval(std::time::Duration::from_secs(15));
 
@@ -210,15 +229,32 @@ impl OpenSshClient {
         Ok(builder)
     }
 
-    async fn connect(host: &HostConfig) -> Result<Session, AppError> {
+    async fn connect(host: &HostConfig, known_hosts: KnownHosts) -> Result<Session, AppError> {
         if host.address.trim().is_empty() {
             return Err(AppError::config_invalid("Host address is required"));
         }
 
-        Self::builder_for(host)?
+        match Self::builder_for(host, known_hosts)?
             .connect_mux(host.address.trim())
             .await
-            .map_err(map_openssh_connect_error)
+        {
+            Ok(session) => Ok(session),
+            Err(error) => {
+                let app_error = map_openssh_connect_error(error);
+                if app_error.code == AppErrorCode::SshHostKeyUnknown.as_str() {
+                    return Err(match scan_host_key_fingerprint(host) {
+                        Ok(fingerprint) => app_error.with_fingerprint(fingerprint),
+                        Err(scan_error) => {
+                            let detail =
+                                app_error.detail.as_deref().unwrap_or_default().to_string();
+                            app_error.with_detail(format!("{detail}; fingerprintScan={scan_error}"))
+                        }
+                    });
+                }
+
+                Err(app_error)
+            }
+        }
     }
 
     fn session_signature(host: &HostConfig) -> String {
@@ -301,9 +337,23 @@ impl OpenSshClient {
             return Ok(session);
         }
 
-        let session = Arc::new(Self::connect(host).await?);
+        let session = Arc::new(Self::connect(host, KnownHosts::Strict).await?);
         self.store_session(host, Arc::clone(&session))?;
         Ok(session)
+    }
+
+    async fn accept_new_host_key(
+        &self,
+        host: &HostConfig,
+        expected_fingerprint: &str,
+    ) -> Result<String, AppError> {
+        let fingerprint = scan_host_key_fingerprint(host)?;
+        validate_expected_fingerprint(&fingerprint, expected_fingerprint)?;
+
+        let session = Self::connect(host, KnownHosts::Add).await?;
+        drop(session);
+        self.drop_cached_session(&host.id)?;
+        Ok(fingerprint)
     }
 
     async fn exec_program(
@@ -445,6 +495,14 @@ impl SshClient for OpenSshClient {
         self.exec_with_reconnect(host, command).await
     }
 
+    async fn accept_host_key(
+        &self,
+        host: &HostConfig,
+        expected_fingerprint: &str,
+    ) -> Result<String, AppError> {
+        self.accept_new_host_key(host, expected_fingerprint).await
+    }
+
     fn disconnect_host(&self, host_id: &str) -> Result<(), AppError> {
         self.drop_cached_session(host_id)
     }
@@ -483,6 +541,167 @@ fn output_to_string(output: std::process::Output) -> Result<String, AppError> {
 
 fn should_retry_with_fresh_session(error: &AppError) -> bool {
     error.code == AppErrorCode::SshConnectFailed.as_str()
+}
+
+fn scan_host_key_fingerprint(host: &HostConfig) -> Result<String, AppError> {
+    let target = resolve_keyscan_target(host)?;
+    let keyscan = Command::new("/usr/bin/ssh-keyscan")
+        .arg("-T")
+        .arg("8")
+        .arg("-p")
+        .arg(target.port.to_string())
+        .arg(&target.hostname)
+        .output()
+        .map_err(|err| {
+            AppError::new(
+                AppErrorCode::SshHostKeyUnknown,
+                "Failed to run ssh-keyscan for host key fingerprint",
+            )
+            .with_detail(err.to_string())
+        })?;
+
+    if !keyscan.status.success() || keyscan.stdout.is_empty() {
+        return Err(AppError::new(
+            AppErrorCode::SshHostKeyUnknown,
+            "Failed to scan SSH host key fingerprint",
+        )
+        .with_detail(String::from_utf8_lossy(&keyscan.stderr).trim().to_string()));
+    }
+
+    fingerprint_from_known_host_entry(&keyscan.stdout)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct KeyscanTarget {
+    hostname: String,
+    port: u16,
+}
+
+fn resolve_keyscan_target(host: &HostConfig) -> Result<KeyscanTarget, AppError> {
+    let address = host.address.trim();
+    if address.is_empty() {
+        return Err(AppError::config_invalid("Host address is required"));
+    }
+    if address.starts_with('-') {
+        return Err(AppError::config_invalid("Host address is invalid"));
+    }
+
+    let output = Command::new("/usr/bin/ssh")
+        .arg("-G")
+        .arg("-p")
+        .arg(host.port.to_string())
+        .arg("--")
+        .arg(address)
+        .output();
+
+    let Ok(output) = output else {
+        return Ok(KeyscanTarget {
+            hostname: address.to_string(),
+            port: host.port,
+        });
+    };
+
+    if !output.status.success() {
+        return Ok(KeyscanTarget {
+            hostname: address.to_string(),
+            port: host.port,
+        });
+    }
+
+    let config = String::from_utf8_lossy(&output.stdout);
+    let hostname = ssh_config_value(&config, "hostname")
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or(address)
+        .to_string();
+    let port = ssh_config_value(&config, "port")
+        .and_then(|value| value.parse::<u16>().ok())
+        .unwrap_or(host.port);
+    if hostname.trim().is_empty() || hostname.starts_with('-') {
+        return Err(AppError::config_invalid("Resolved host address is invalid"));
+    }
+
+    Ok(KeyscanTarget { hostname, port })
+}
+
+fn ssh_config_value<'a>(config: &'a str, key: &str) -> Option<&'a str> {
+    config.lines().find_map(|line| {
+        let mut parts = line.split_whitespace();
+        let candidate_key = parts.next()?;
+        let value = parts.next()?;
+        (candidate_key.eq_ignore_ascii_case(key)).then_some(value.trim())
+    })
+}
+
+fn fingerprint_from_known_host_entry(input: &[u8]) -> Result<String, AppError> {
+    let mut child = Command::new("/usr/bin/ssh-keygen")
+        .arg("-l")
+        .arg("-E")
+        .arg("sha256")
+        .arg("-f")
+        .arg("-")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|err| {
+            AppError::new(
+                AppErrorCode::SshHostKeyUnknown,
+                "Failed to run ssh-keygen for host key fingerprint",
+            )
+            .with_detail(err.to_string())
+        })?;
+
+    if let Some(mut stdin) = child.stdin.take() {
+        stdin.write_all(input).map_err(|err| {
+            AppError::new(
+                AppErrorCode::SshHostKeyUnknown,
+                "Failed to pass host key to ssh-keygen",
+            )
+            .with_detail(err.to_string())
+        })?;
+    }
+
+    let output = child.wait_with_output().map_err(|err| {
+        AppError::new(
+            AppErrorCode::SshHostKeyUnknown,
+            "Failed to read ssh-keygen host key fingerprint",
+        )
+        .with_detail(err.to_string())
+    })?;
+
+    if !output.status.success() {
+        return Err(AppError::new(
+            AppErrorCode::SshHostKeyUnknown,
+            "Failed to parse SSH host key fingerprint",
+        )
+        .with_detail(String::from_utf8_lossy(&output.stderr).trim().to_string()));
+    }
+
+    parse_ssh_keygen_fingerprint(&String::from_utf8_lossy(&output.stdout)).ok_or_else(|| {
+        AppError::new(
+            AppErrorCode::SshHostKeyUnknown,
+            "ssh-keygen did not return a SHA256 host key fingerprint",
+        )
+    })
+}
+
+fn parse_ssh_keygen_fingerprint(output: &str) -> Option<String> {
+    output
+        .split_whitespace()
+        .find(|part| part.starts_with("SHA256:"))
+        .map(str::to_string)
+}
+
+fn validate_expected_fingerprint(scanned: &str, expected: &str) -> Result<(), AppError> {
+    if scanned == expected {
+        return Ok(());
+    }
+
+    Err(AppError::new(
+        AppErrorCode::SshHostKeyChanged,
+        "SSH host key fingerprint changed before confirmation",
+    )
+    .with_fingerprint(scanned.to_string()))
 }
 
 const FAST_METRICS_SCRIPT: &str = r#"
@@ -680,6 +899,7 @@ fn map_ssh_io_error(error: &std::io::Error, fallback_message: &'static str) -> A
     }
 
     if detail_lower.contains("no host key is known")
+        || detail_lower.contains("host key is known")
         || detail_lower.contains("host key verification failed")
         || detail_lower.contains("authenticity of host")
         || detail_lower.contains("strict host key checking")
@@ -724,6 +944,7 @@ pub type DynSshClient = Arc<dyn SshClient>;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io;
 
     #[test]
     fn parses_full_metrics_batch_sections() {
@@ -787,6 +1008,49 @@ __VPSCOPE_SECTION:diskstats__
         assert!(output.df.is_none());
         assert!(output.ps.is_none());
         assert!(output.diskstats.contains("vda"));
+    }
+
+    #[test]
+    fn maps_unknown_host_key_error() {
+        let error = map_ssh_io_error(
+            &io::Error::new(
+                io::ErrorKind::Other,
+                "No ED25519 host key is known for example.com and you have requested strict checking.",
+            ),
+            "SSH connection failed",
+        );
+
+        assert_eq!(error.code, "SSH_HOST_KEY_UNKNOWN");
+    }
+
+    #[test]
+    fn maps_changed_host_key_error() {
+        let error = map_ssh_io_error(
+            &io::Error::new(
+                io::ErrorKind::Other,
+                "WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED! Offending key in /Users/me/.ssh/known_hosts:4",
+            ),
+            "SSH connection failed",
+        );
+
+        assert_eq!(error.code, "SSH_HOST_KEY_CHANGED");
+    }
+
+    #[test]
+    fn parses_sha256_fingerprint_from_ssh_keygen_output() {
+        assert_eq!(
+            parse_ssh_keygen_fingerprint("256 SHA256:abc123 host.example.com (ED25519)\n"),
+            Some("SHA256:abc123".to_string())
+        );
+    }
+
+    #[test]
+    fn rejects_host_key_confirmation_when_fingerprint_changes() {
+        let error = validate_expected_fingerprint("SHA256:new", "SHA256:old")
+            .expect_err("changed fingerprint must fail");
+
+        assert_eq!(error.code, "SSH_HOST_KEY_CHANGED");
+        assert_eq!(error.fingerprint.as_deref(), Some("SHA256:new"));
     }
 
     #[tokio::test]

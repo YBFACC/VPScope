@@ -607,6 +607,21 @@ pub struct HostTestConnectionPayload {
     pub draft: Option<HostCreatePayload>,
 }
 
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HostAcceptKeyPayload {
+    pub id: Option<String>,
+    pub draft: Option<HostCreatePayload>,
+    pub fingerprint: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HostAcceptKeyResult {
+    pub ok: bool,
+    pub fingerprint: String,
+}
+
 #[tauri::command]
 pub async fn host_test_connection(
     payload: Option<HostTestConnectionPayload>,
@@ -615,11 +630,60 @@ pub async fn host_test_connection(
     state: State<'_, AppState>,
 ) -> Result<crate::ssh::ConnectionInfo, AppError> {
     let payload = payload.unwrap_or(HostTestConnectionPayload { id, draft });
-    let host = if let Some(id) = payload.id {
-        state.config_store.get_host(&id)?
-    } else if let Some(draft) = payload.draft {
+    let host = host_from_connection_payload(payload.id, payload.draft, &state)?;
+
+    state.ssh_pool.client().test_connection(&host).await
+}
+
+#[tauri::command]
+pub async fn host_accept_key(
+    payload: Option<HostAcceptKeyPayload>,
+    id: Option<String>,
+    draft: Option<HostCreatePayload>,
+    fingerprint: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<HostAcceptKeyResult, AppError> {
+    let payload = match payload {
+        Some(payload) => payload,
+        None => HostAcceptKeyPayload {
+            id,
+            draft,
+            fingerprint: fingerprint
+                .ok_or_else(|| AppError::config_invalid("Host key fingerprint is required"))?,
+        },
+    };
+    let fingerprint = payload.fingerprint.trim();
+    if !fingerprint.starts_with("SHA256:") {
+        return Err(AppError::config_invalid(
+            "Host key fingerprint must use the SHA256 format",
+        ));
+    }
+
+    let host = host_from_connection_payload(payload.id, payload.draft, &state)?;
+    let fingerprint = state
+        .ssh_pool
+        .client()
+        .accept_host_key(&host, fingerprint)
+        .await?;
+
+    Ok(HostAcceptKeyResult {
+        ok: true,
+        fingerprint,
+    })
+}
+
+fn host_from_connection_payload(
+    id: Option<String>,
+    draft: Option<HostCreatePayload>,
+    state: &AppState,
+) -> Result<HostConfig, AppError> {
+    if let Some(id) = id {
+        return state.config_store.get_host(&id);
+    }
+
+    if let Some(draft) = draft {
         let now = unix_ms();
-        HostConfig {
+        return Ok(HostConfig {
             id: "draft".to_string(),
             name: draft.name,
             address: draft.address,
@@ -629,14 +693,12 @@ pub async fn host_test_connection(
             tags: draft.tags,
             created_at: now,
             updated_at: now,
-        }
-    } else {
-        return Err(AppError::config_invalid(
-            "Host id or draft host is required",
-        ));
-    };
+        });
+    }
 
-    state.ssh_pool.client().test_connection(&host).await
+    Err(AppError::config_invalid(
+        "Host id or draft host is required",
+    ))
 }
 
 #[cfg(test)]

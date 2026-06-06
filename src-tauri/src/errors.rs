@@ -39,6 +39,8 @@ pub struct AppError {
     pub message: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub detail: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fingerprint: Option<String>,
     pub retryable: bool,
 }
 
@@ -48,6 +50,7 @@ impl AppError {
             code: code.as_str().to_string(),
             message: message.into(),
             detail: None,
+            fingerprint: None,
             retryable: matches!(
                 code,
                 AppErrorCode::SshConnectFailed
@@ -60,6 +63,11 @@ impl AppError {
 
     pub fn with_detail(mut self, detail: impl Into<String>) -> Self {
         self.detail = Some(detail.into());
+        self
+    }
+
+    pub fn with_fingerprint(mut self, fingerprint: impl Into<String>) -> Self {
+        self.fingerprint = Some(fingerprint.into());
         self
     }
 

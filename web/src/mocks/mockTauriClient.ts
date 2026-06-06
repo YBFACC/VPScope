@@ -246,6 +246,13 @@ export function createMockTauriClient(): VPScopeClient {
         fingerprint: "SHA256:mockedHostKeyFingerprintvpscope",
       };
     },
+    async acceptHostKey(payload) {
+      await wait(180);
+      return {
+        ok: true,
+        fingerprint: payload.fingerprint,
+      };
+    },
     async getLastSnapshot(hostId) {
       await wait(40);
       return createMockSnapshot(hostId);

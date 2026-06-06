@@ -10,6 +10,8 @@ import { createMockTauriClient } from "@/mocks/mockTauriClient";
 import type {
   AlertSettings,
   AppError,
+  HostAcceptKeyPayload,
+  HostAcceptKeyResult,
   HostConfig,
   HostConnectionState,
   HostCreatePayload,
@@ -47,6 +49,7 @@ export type VPScopeClient = {
   deleteHost(id: HostId): Promise<void>;
   openTerminal(hostId: HostId): Promise<HostOpenTerminalResult>;
   testConnection(payload: HostTestConnectionPayload): Promise<HostTestConnectionResult>;
+  acceptHostKey(payload: HostAcceptKeyPayload): Promise<HostAcceptKeyResult>;
   getLastSnapshot(hostId: HostId): Promise<HostSnapshot | null>;
   subscribeMetrics(payload: MetricsSubscribePayload, onSnapshot: MetricsSnapshotHandler): Promise<() => Promise<void>>;
   listenMetricsErrors(onError: MetricsErrorHandler): Promise<() => void>;
@@ -107,6 +110,9 @@ function createTauriClient(): VPScopeClient {
     },
     async testConnection(payload) {
       return invoke<HostTestConnectionResult>("host_test_connection", payload);
+    },
+    async acceptHostKey(payload) {
+      return invoke<HostAcceptKeyResult>("host_accept_key", payload);
     },
     async getLastSnapshot(hostId) {
       return invoke<HostSnapshot | null>("metrics_last_snapshot", { hostId });

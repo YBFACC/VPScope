@@ -590,6 +590,9 @@ fn validate_host_fields(
     if address.trim().is_empty() {
         return Err(AppError::config_invalid("Host address is required"));
     }
+    if address.trim().starts_with('-') {
+        return Err(AppError::config_invalid("Host address is invalid"));
+    }
     if port == 0 {
         return Err(AppError::config_invalid(
             "Host port must be greater than zero",

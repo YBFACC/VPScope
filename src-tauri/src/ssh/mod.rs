@@ -1,5 +1,4 @@
 pub mod client;
-pub mod known_hosts;
 pub mod session_pool;
 
 pub use client::{

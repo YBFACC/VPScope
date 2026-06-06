@@ -32,6 +32,7 @@ export type AppError = {
     | "INTERNAL";
   message: string;
   detail?: string;
+  fingerprint?: string;
   retryable: boolean;
 };
 
@@ -394,6 +395,36 @@ type HostTestConnectionResult = {
   fingerprint?: string;
 };
 ```
+
+### `host_accept_key`
+
+用途：用户确认首次连接的 SSH host key 后，让系统 OpenSSH 将该 key 写入默认 `~/.ssh/known_hosts`。该命令只接受结构化 host payload 和用户确认过的 fingerprint，不允许前端传入任意 shell 字符串。
+
+请求：
+
+```ts
+type HostAcceptKeyPayload = {
+  id?: HostId;
+  draft?: HostCreatePayload;
+  fingerprint: string;
+};
+```
+
+响应：
+
+```ts
+type HostAcceptKeyResult = {
+  ok: true;
+  fingerprint: string;
+};
+```
+
+规则：
+
+- 后端会重新扫描目标 host key，并确认扫描到的 fingerprint 与请求中的 `fingerprint` 完全一致。
+- fingerprint 不一致时返回 `SSH_HOST_KEY_CHANGED` 或 `CONFIG_INVALID`，且不得写入 known_hosts。
+- 写入动作由系统 OpenSSH 通过 `StrictHostKeyChecking=accept-new` 完成，VPScope 不拼接、不覆盖、不维护私有 known_hosts 文件。
+- `SSH_HOST_KEY_CHANGED` 只阻断连接，用户需要用系统 SSH 工具人工检查或清理 known_hosts。
 
 ### `metrics_subscribe`
 

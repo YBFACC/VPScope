@@ -28,6 +28,9 @@ export function DashboardPage() {
     () => typeof document === "undefined" || document.visibilityState !== "hidden",
   );
   const [hostFormOpen, setHostFormOpen] = useState(false);
+  const [dismissedHostKey, setDismissedHostKey] = useState<string>();
+  const [isAcceptingHostKey, setIsAcceptingHostKey] = useState(false);
+  const [hostKeyMessage, setHostKeyMessage] = useState<string>();
   const loadHosts = useHostStore((state) => state.loadHosts);
   const isLoadingHosts = useHostStore((state) => state.isLoading);
   const hosts = useHostStore((state) => state.hosts);
@@ -66,6 +69,14 @@ export function DashboardPage() {
   const selectPrevNetworkInterface = useUiStore((state) => state.selectPrevNetworkInterface);
   const { t } = useI18n();
   const isOverview = viewMode === "overview";
+  const hostKeyError =
+    selectedHostId && selectedHost
+      ? ([metricsError, connection?.lastError].find(
+          (error) => error?.code === "SSH_HOST_KEY_UNKNOWN" && error.fingerprint,
+        ) ?? undefined)
+      : undefined;
+  const hostKeyPromptId = hostKeyError?.fingerprint ? `${selectedHostId}:${hostKeyError.fingerprint}` : undefined;
+  const showHostKeyPrompt = Boolean(hostKeyError?.fingerprint && hostKeyPromptId !== dismissedHostKey);
 
   useEffect(() => {
     void loadHosts();
@@ -236,8 +247,76 @@ export function DashboardPage() {
     snapshot,
   ]);
 
+  async function acceptSelectedHostKey() {
+    if (!selectedHostId || !hostKeyError?.fingerprint) {
+      return;
+    }
+
+    setIsAcceptingHostKey(true);
+    setHostKeyMessage(undefined);
+    try {
+      await runClient(() =>
+        tauriClient.acceptHostKey({
+          id: selectedHostId,
+          fingerprint: hostKeyError.fingerprint as string,
+        }),
+      );
+      setDismissedHostKey(undefined);
+      await subscribeToHost(selectedHostId);
+    } catch (error) {
+      const appError = error as { code?: string; message?: string };
+      setHostKeyMessage(appError.code === "SSH_HOST_KEY_CHANGED" ? t("hostKeyChanged") : appError.message);
+    } finally {
+      setIsAcceptingHostKey(false);
+    }
+  }
+
   return (
     <main className="cockpit-surface h-screen overflow-hidden bg-[var(--color-bg)] p-1 text-[var(--color-text)]">
+      {showHostKeyPrompt && selectedHost ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-[var(--color-overlay)] p-4">
+          <div className="grid w-full max-w-lg gap-3 rounded-[var(--radius-panel)] border border-[var(--color-warning)] bg-[var(--color-panel-glass)] p-3 font-mono shadow-[var(--shadow-panel)]">
+            <div>
+              <h2 className="text-sm font-semibold uppercase text-[var(--color-text)]">{t("hostKeyUnknown")}</h2>
+              <p className="mt-1 text-[11px] uppercase leading-4 text-[var(--color-text-muted)]">
+                {t("hostKeyUnknownMessage")}
+              </p>
+            </div>
+            <div className="grid gap-1 text-[11px] uppercase text-[var(--color-text-muted)]">
+              <span>
+                {t("host")}: <span className="text-[var(--color-text)]">{selectedHost.name}</span>
+              </span>
+              <span>
+                {t("address")}:{" "}
+                <span className="text-[var(--color-text)]">
+                  {selectedHost.address}:{selectedHost.port}
+                </span>
+              </span>
+              <code className="block overflow-hidden text-ellipsis rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-input)] px-2 py-1 text-[var(--color-accent)]">
+                {hostKeyError?.fingerprint}
+              </code>
+              {hostKeyMessage ? <span className="text-[var(--color-danger)]">{hostKeyMessage}</span> : null}
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setDismissedHostKey(hostKeyPromptId)}
+                className="control-button"
+              >
+                {t("cancel")}
+              </button>
+              <button
+                type="button"
+                onClick={acceptSelectedHostKey}
+                className="control-button"
+                disabled={isAcceptingHostKey}
+              >
+                {isAcceptingHostKey ? t("requesting") : t("trustHostKey")}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       <div className="grid h-full w-full grid-rows-[auto_minmax(0,1fr)] gap-1">
         <TopToolbar onAddHost={() => setHostFormOpen(true)} />
 

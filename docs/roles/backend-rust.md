@@ -57,7 +57,6 @@ src-tauri/src/
   ssh/
     mod.rs
     client.rs
-    known_hosts.rs
     session_pool.rs
   metrics/
     mod.rs
@@ -281,16 +280,11 @@ pub enum RemoteCommand {
 - unknown host: 返回 `SSH_HOST_KEY_UNKNOWN`，前端让用户确认。
 - changed host: 返回 `SSH_HOST_KEY_CHANGED`，强警告，不自动覆盖。
 
-建议存储位置：
-
-```text
-~/Library/Application Support/VPScope/known_hosts
-```
-
 实现要求：
 
 - fingerprint 使用清晰格式，例如 `SHA256:xxxx`。
-- 用户确认后才写入 known_hosts。
+- 使用系统 OpenSSH 默认 `~/.ssh/known_hosts` 作为唯一信任源，不维护 VPScope 私有 known_hosts 文件。
+- 用户确认后，通过系统 OpenSSH `StrictHostKeyChecking=accept-new` 写入 known_hosts。
 - host key changed 必须阻断连接。
 
 验收：
