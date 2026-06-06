@@ -29,6 +29,8 @@ import type {
   SshConfigHost,
   TerminalSettings,
   TraySettings,
+  VpscopeCommandPayloads,
+  VpscopeCommandResults,
 } from "@/types/contracts";
 
 export type NativeNotificationPermission = "granted" | "denied" | "prompt";
@@ -69,6 +71,13 @@ export type VPScopeClient = {
 export type ClientMode = "mock" | "tauri";
 
 const clientModeStorageKey = "vpscope-client-mode";
+
+function invokeCommand<Command extends keyof VpscopeCommandPayloads>(
+  command: Command,
+  payload: VpscopeCommandPayloads[Command],
+) {
+  return invoke<VpscopeCommandResults[Command]>(command, payload);
+}
 
 function toAppError(error: unknown): AppError {
   if (typeof error === "object" && error !== null && "code" in error && "message" in error) {
@@ -147,19 +156,19 @@ function createTauriClient(): VPScopeClient {
       return invoke<TraySettings>("tray_settings_get", {});
     },
     async updateTraySettings(settings) {
-      return invoke<TraySettings>("tray_settings_update", { settings });
+      return invokeCommand("tray_settings_update", { settings });
     },
     async getAlertSettings() {
       return invoke<AlertSettings>("alert_settings_get", {});
     },
     async updateAlertSettings(settings) {
-      return invoke<AlertSettings>("alert_settings_update", { settings });
+      return invokeCommand("alert_settings_update", { settings });
     },
     async getTerminalSettings() {
       return invoke<TerminalSettings>("terminal_settings_get", {});
     },
     async updateTerminalSettings(settings) {
-      return invoke<TerminalSettings>("terminal_settings_update", { settings });
+      return invokeCommand("terminal_settings_update", { settings });
     },
     async getNotificationPermission() {
       if (typeof window === "undefined" || !("Notification" in window)) {

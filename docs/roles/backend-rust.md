@@ -51,9 +51,6 @@ src-tauri/src/
     mod.rs
     host_config.rs
     storage.rs
-  credentials/
-    mod.rs
-    keychain.rs
   ssh/
     mod.rs
     client.rs
@@ -79,7 +76,8 @@ src-tauri/src/
 
 - 使用 `serde` 定义所有 command payload/result。
 - Rust 字段通过 `#[serde(rename_all = "camelCase")]` 输出给前端。
-- 不把 password、private key、passphrase 写入普通配置文件。
+- 不把 password、private key 内容或 passphrase 写入普通配置文件。
+- MVP 不实现 app-managed password/passphrase；认证必须走系统 OpenSSH password-less 路径。
 - 前端不可传入任意命令字符串。
 - 所有远程命令必须在后端白名单内。
 - SSH session 需要复用，避免每次刷新重连。
@@ -93,14 +91,13 @@ src-tauri/src/
 2. 配置 `tauri.conf.json` 指向 `/web/dist`。
 3. 开发模式指向 `/web` Vite dev server。
 4. 建立最小 `main.rs`，注册 commands。
-5. 建立 `AppState`，放入 config store、credential store、ssh session pool、metrics scheduler。
+5. 建立 `AppState`，放入 config store、ssh session pool、metrics scheduler。
 
 `AppState` 建议：
 
 ```rust
 pub struct AppState {
     pub config_store: Arc<ConfigStore>,
-    pub credential_store: Arc<CredentialStore>,
     pub ssh_pool: Arc<SshSessionPool>,
     pub metrics_scheduler: Arc<MetricsScheduler>,
 }
@@ -137,6 +134,7 @@ pub struct AppError {
 
 - command 返回错误时，前端能拿到稳定 code。
 - 日志里不包含 password、private key 内容和 passphrase。
+- 后端不得接受 `password`、`passwordRef`、`passphrase`、`passphraseRef` 或 `keyRef` 字段。
 
 ### Step 3: 实现 Host 配置存储
 
@@ -155,7 +153,6 @@ Host 配置存放在 app config dir，例如：
 - username
 - auth type
 - key path
-- credential ref
 - refresh interval
 - tags
 - created/updated
@@ -177,53 +174,30 @@ Host 配置存放在 app config dir，例如：
 
 - `host_create` 生成稳定 UUID。
 - `host_update` 更新 `updatedAt`。
-- `host_delete` 同时删除 Keychain 凭据。
+- `host_delete` 同时清理 tray/alert 等普通偏好引用。
 - 写文件使用原子写入，避免崩溃时损坏配置。
 
 验收：
 
 - 重启 app 后 host 列表仍存在。
-- 删除 host 后相关凭据也被清理。
+- 删除 host 后相关普通偏好引用也被清理。
 
-### Step 4: 实现凭据管理
+### Step 4: 明确 SSH 认证边界
 
-MVP 当前通过 `keyring` 的 Apple native backend 接入 macOS Keychain，并封装在 `CredentialStore` 后面，业务代码只处理 credential ref，不直接持有持久化明文 secret。
-
-接口建议：
-
-```rust
-pub struct CredentialStore;
-
-impl CredentialStore {
-    pub fn save_password(&self, host_id: &str, username: &str, password: &str) -> Result<String, AppError>;
-    pub fn get_password(&self, credential_ref: &str) -> Result<String, AppError>;
-    pub fn save_passphrase(&self, host_id: &str, passphrase: &str) -> Result<String, AppError>;
-    pub fn get_passphrase(&self, credential_ref: &str) -> Result<String, AppError>;
-    pub fn delete_for_host(&self, host_id: &str) -> Result<(), AppError>;
-}
-```
-
-`credential_ref` 固定格式：
-
-```text
-vpscope://credential/{host_id}/password
-vpscope://credential/{host_id}/passphrase
-```
+MVP 只支持 password-less OpenSSH 认证路径：`ssh_agent`、只读导入的 `~/.ssh/config` alias，以及已经可由系统 OpenSSH、`ssh-agent` 或系统 Keychain 无交互使用的 private key file。
 
 实现规则：
 
-- `auth.password` 和 `auth.passphrase` 只允许作为一次性 command 请求字段。
-- `host_create` / `host_update` 收到明文 secret 后必须立即写入 Keychain，并在返回的 `HostConfig` 与 `hosts.json` 中只保留 `passwordRef` / `passphraseRef`。
-- 同类型更新且未提供新明文 secret 时，保留旧 ref。
-- 认证类型切换后，清理该 host 已不再使用的 Keychain 凭据。
-- 删除 host 后清理该 host 的 password 和 passphrase 凭据。
+- `HostAuth` 只允许 `ssh_agent` 与 `private_key`。
+- `private_key` 只保存 `username` 和可选 `keyPath`。
+- 旧 `password` auth 或旧 app-managed 字段必须在 serde/校验阶段返回 `CONFIG_INVALID`，不得静默忽略。
+- 后端不保存、不读取 password 或 private key passphrase。
+- 需要 passphrase 的 key 必须由系统 OpenSSH、`ssh-agent` 或系统 Keychain 预先解锁。
 
 验收：
 
-- 配置文件中看不到密码。
-- 配置文件中看不到私钥 passphrase。
-- Keychain entry 缺失或 ref 格式错误时返回结构化 `AppError`，不静默降级。
-- 凭据读取失败能返回 `CONFIG_INVALID` 或 `INTERNAL`。
+- 配置文件中不出现 `passwordRef`、`passphraseRef` 或 `keyRef`。
+- 旧 app-managed credential 字段反序列化失败并映射到 `CONFIG_INVALID`。
 
 ### Step 5: 选择并封装 SSH Client
 

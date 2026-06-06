@@ -42,11 +42,8 @@ pub fn host_create(
         tags: tags.unwrap_or_default(),
     };
     state.config_store.validate_host_create(&payload)?;
-    let auth = normalize_auth_for_create(&id, payload.auth, &state)?;
 
-    state
-        .config_store
-        .create_host_with_id(id, HostCreatePayload { auth, ..payload })
+    state.config_store.create_host_with_id(id, payload)
 }
 
 #[tauri::command]
@@ -63,15 +60,10 @@ pub fn host_update(
             patch: patch.ok_or_else(|| AppError::config_invalid("Host patch is required"))?,
         },
     };
-    let existing = state.config_store.get_host(&payload.id)?;
     state
         .config_store
         .validate_host_update(&payload.id, &payload.patch)?;
-    let (patch, cleanup) =
-        normalize_patch_for_update(&payload.id, &existing.auth, payload.patch, &state)?;
-    let updated = state.config_store.update_host(&payload.id, patch)?;
-    cleanup_credentials(&payload.id, cleanup, &state)?;
-    Ok(updated)
+    state.config_store.update_host(&payload.id, payload.patch)
 }
 
 #[tauri::command]
@@ -98,7 +90,6 @@ pub fn host_delete(
         .or(id)
         .ok_or_else(|| AppError::config_invalid("Host id is required"))?;
     state.config_store.delete_host(&id)?;
-    state.credential_store.delete_for_host(&id)?;
     state
         .tray_state
         .set_settings(state.config_store.get_tray_settings()?);
@@ -199,163 +190,8 @@ fn build_ssh_args(host: &HostConfig) -> Result<Vec<String>, AppError> {
 
 fn auth_username(auth: &HostAuth) -> &str {
     match auth {
-        HostAuth::Password { username, .. }
-        | HostAuth::PrivateKey { username, .. }
-        | HostAuth::SshAgent { username } => username,
+        HostAuth::PrivateKey { username, .. } | HostAuth::SshAgent { username } => username,
     }
-}
-
-#[derive(Debug, Clone, Copy, Default)]
-struct CredentialCleanup {
-    password: bool,
-    passphrase: bool,
-}
-
-fn normalize_auth_for_create(
-    host_id: &str,
-    auth: HostAuth,
-    state: &AppState,
-) -> Result<HostAuth, AppError> {
-    match auth {
-        HostAuth::Password {
-            username,
-            password,
-            password_ref,
-        } => {
-            let password_ref = match password {
-                Some(password) => Some(
-                    state
-                        .credential_store
-                        .save_password(host_id, &username, &password)?,
-                ),
-                None => password_ref,
-            };
-            Ok(HostAuth::Password {
-                username,
-                password: None,
-                password_ref,
-            })
-        }
-        HostAuth::PrivateKey {
-            username,
-            key_path,
-            key_ref,
-            passphrase,
-            passphrase_ref,
-        } => {
-            let passphrase_ref = match passphrase {
-                Some(passphrase) => Some(
-                    state
-                        .credential_store
-                        .save_passphrase(host_id, &passphrase)?,
-                ),
-                None => passphrase_ref,
-            };
-            Ok(HostAuth::PrivateKey {
-                username,
-                key_path,
-                key_ref,
-                passphrase: None,
-                passphrase_ref,
-            })
-        }
-        HostAuth::SshAgent { username } => Ok(HostAuth::SshAgent { username }),
-    }
-}
-
-fn normalize_patch_for_update(
-    host_id: &str,
-    existing_auth: &HostAuth,
-    mut patch: HostPatch,
-    state: &AppState,
-) -> Result<(HostPatch, CredentialCleanup), AppError> {
-    let Some(auth) = patch.auth.take() else {
-        return Ok((patch, CredentialCleanup::default()));
-    };
-
-    let mut cleanup = CredentialCleanup::default();
-    let normalized_auth = match auth {
-        HostAuth::Password {
-            username,
-            password,
-            password_ref,
-        } => {
-            cleanup.passphrase = matches!(existing_auth, HostAuth::PrivateKey { .. });
-            let password_ref = match password {
-                Some(password) => Some(
-                    state
-                        .credential_store
-                        .save_password(host_id, &username, &password)?,
-                ),
-                None => match existing_auth {
-                    HostAuth::Password {
-                        password_ref: existing_ref,
-                        ..
-                    } => password_ref.or_else(|| existing_ref.clone()),
-                    _ => password_ref,
-                },
-            };
-
-            HostAuth::Password {
-                username,
-                password: None,
-                password_ref,
-            }
-        }
-        HostAuth::PrivateKey {
-            username,
-            key_path,
-            key_ref,
-            passphrase,
-            passphrase_ref,
-        } => {
-            cleanup.password = matches!(existing_auth, HostAuth::Password { .. });
-            let passphrase_ref = match passphrase {
-                Some(passphrase) => Some(
-                    state
-                        .credential_store
-                        .save_passphrase(host_id, &passphrase)?,
-                ),
-                None => match existing_auth {
-                    HostAuth::PrivateKey {
-                        passphrase_ref: existing_ref,
-                        ..
-                    } => passphrase_ref.or_else(|| existing_ref.clone()),
-                    _ => passphrase_ref,
-                },
-            };
-
-            HostAuth::PrivateKey {
-                username,
-                key_path,
-                key_ref,
-                passphrase: None,
-                passphrase_ref,
-            }
-        }
-        HostAuth::SshAgent { username } => {
-            cleanup.password = matches!(existing_auth, HostAuth::Password { .. });
-            cleanup.passphrase = matches!(existing_auth, HostAuth::PrivateKey { .. });
-            HostAuth::SshAgent { username }
-        }
-    };
-
-    patch.auth = Some(normalized_auth);
-    Ok((patch, cleanup))
-}
-
-fn cleanup_credentials(
-    host_id: &str,
-    cleanup: CredentialCleanup,
-    state: &AppState,
-) -> Result<(), AppError> {
-    if cleanup.password {
-        state.credential_store.delete_password_for_host(host_id)?;
-    }
-    if cleanup.passphrase {
-        state.credential_store.delete_passphrase_for_host(host_id)?;
-    }
-    Ok(())
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -704,13 +540,8 @@ fn host_from_connection_payload(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        config::ConfigStore, credentials::CredentialStore, metrics::MetricsScheduler,
-        ssh::SshSessionPool, tray::TrayState,
-    };
     use std::{
         path::PathBuf,
-        sync::Arc,
         time::{Duration, Instant},
     };
     use uuid::Uuid;
@@ -746,20 +577,6 @@ mod tests {
         path
     }
 
-    fn test_state(name: &str) -> AppState {
-        let config_store = Arc::new(ConfigStore::new(temp_test_path(name)).expect("config store"));
-        let tray_state = Arc::new(TrayState::new(
-            config_store.get_tray_settings().expect("tray settings"),
-        ));
-        AppState {
-            config_store,
-            credential_store: Arc::new(CredentialStore::new_in_memory()),
-            ssh_pool: Arc::new(SshSessionPool::new_mock()),
-            metrics_scheduler: Arc::new(MetricsScheduler::new(tray_state.clone())),
-            tray_state,
-        }
-    }
-
     #[test]
     fn builds_basic_ssh_command() {
         let command = build_ssh_terminal_command(&host(HostAuth::SshAgent {
@@ -772,17 +589,14 @@ mod tests {
 
     #[test]
     fn builds_non_default_port_command() {
-        let mut host = host(HostAuth::Password {
+        let mut host = host(HostAuth::SshAgent {
             username: "ops".to_string(),
-            password: None,
-            password_ref: Some("vpscope://credential/host-1/password".to_string()),
         });
         host.port = 2222;
 
         let command = build_ssh_terminal_command(&host).expect("command");
 
         assert_eq!(command, "ssh -p 2222 'ops@203.0.113.10'");
-        assert!(!command.contains("credential"));
     }
 
     #[test]
@@ -790,9 +604,6 @@ mod tests {
         let command = build_ssh_terminal_command(&host(HostAuth::PrivateKey {
             username: "ubuntu".to_string(),
             key_path: Some("/Users/me/.ssh/prod key's.pem".to_string()),
-            key_ref: Some("ignored-secret-ref".to_string()),
-            passphrase: None,
-            passphrase_ref: Some("ignored-passphrase-ref".to_string()),
         }))
         .expect("command");
 
@@ -800,8 +611,6 @@ mod tests {
             command,
             "ssh -p 22 -i '/Users/me/.ssh/prod key'\\''s.pem' 'ubuntu@203.0.113.10'"
         );
-        assert!(!command.contains("ignored-secret-ref"));
-        assert!(!command.contains("ignored-passphrase-ref"));
     }
 
     #[test]
@@ -879,9 +688,6 @@ mod tests {
             &host(HostAuth::PrivateKey {
                 username: "ubuntu".to_string(),
                 key_path: Some("/Users/me/.ssh/prod key.pem".to_string()),
-                key_ref: None,
-                passphrase: None,
-                passphrase_ref: Some("ignored-passphrase-ref".to_string()),
             }),
             &[wezterm_path.clone()],
         )
@@ -942,9 +748,6 @@ mod tests {
         let host = host(HostAuth::PrivateKey {
             username: "ubuntu".to_string(),
             key_path: Some("/Users/me/.ssh/prod key.pem".to_string()),
-            key_ref: None,
-            passphrase: None,
-            passphrase_ref: Some("ignored-passphrase-ref".to_string()),
         });
 
         let ghostty = terminal_launch_command(TerminalApp::Ghostty, &host).expect("ghostty");
@@ -995,141 +798,5 @@ mod tests {
                 ],
             }
         );
-    }
-
-    #[test]
-    fn create_normalizes_password_secret_to_ref() {
-        let state = test_state("create-password-secret");
-        let host_id = "host-password";
-        let auth = normalize_auth_for_create(
-            host_id,
-            HostAuth::Password {
-                username: "ubuntu".to_string(),
-                password: Some("secret-password".to_string()),
-                password_ref: None,
-            },
-            &state,
-        )
-        .expect("normalize auth");
-
-        match auth {
-            HostAuth::Password {
-                password,
-                password_ref,
-                ..
-            } => {
-                assert!(password.is_none());
-                assert_eq!(
-                    password_ref.as_deref(),
-                    Some("vpscope://credential/host-password/password")
-                );
-                assert_eq!(
-                    state
-                        .credential_store
-                        .get_password(password_ref.as_deref().unwrap())
-                        .expect("stored password"),
-                    "secret-password"
-                );
-            }
-            _ => panic!("expected password auth"),
-        }
-    }
-
-    #[test]
-    fn update_preserves_existing_password_ref_when_secret_is_omitted() {
-        let state = test_state("update-preserve-password");
-        let existing = HostAuth::Password {
-            username: "ubuntu".to_string(),
-            password: None,
-            password_ref: Some("vpscope://credential/host-1/password".to_string()),
-        };
-        let patch = HostPatch {
-            auth: Some(HostAuth::Password {
-                username: "ops".to_string(),
-                password: None,
-                password_ref: None,
-            }),
-            ..HostPatch::default()
-        };
-
-        let (patch, cleanup) =
-            normalize_patch_for_update("host-1", &existing, patch, &state).expect("normalize");
-
-        assert!(!cleanup.password);
-        assert!(!cleanup.passphrase);
-        match patch.auth.expect("auth patch") {
-            HostAuth::Password {
-                password,
-                password_ref,
-                ..
-            } => {
-                assert!(password.is_none());
-                assert_eq!(
-                    password_ref.as_deref(),
-                    Some("vpscope://credential/host-1/password")
-                );
-            }
-            _ => panic!("expected password auth"),
-        }
-    }
-
-    #[test]
-    fn update_private_key_cleans_obsolete_password_ref() {
-        let state = test_state("update-clean-password");
-        state
-            .credential_store
-            .save_password("host-1", "ubuntu", "old-password")
-            .expect("seed password");
-        let existing = HostAuth::Password {
-            username: "ubuntu".to_string(),
-            password: None,
-            password_ref: Some("vpscope://credential/host-1/password".to_string()),
-        };
-        let patch = HostPatch {
-            auth: Some(HostAuth::PrivateKey {
-                username: "ubuntu".to_string(),
-                key_path: Some("~/.ssh/id_ed25519".to_string()),
-                key_ref: None,
-                passphrase: Some("new-passphrase".to_string()),
-                passphrase_ref: None,
-            }),
-            ..HostPatch::default()
-        };
-
-        let (patch, cleanup) =
-            normalize_patch_for_update("host-1", &existing, patch, &state).expect("normalize");
-        cleanup_credentials("host-1", cleanup, &state).expect("cleanup");
-
-        assert!(cleanup.password);
-        assert!(!cleanup.passphrase);
-        assert_eq!(
-            state
-                .credential_store
-                .get_password("vpscope://credential/host-1/password")
-                .expect_err("old password deleted")
-                .code,
-            "CONFIG_INVALID"
-        );
-        match patch.auth.expect("auth patch") {
-            HostAuth::PrivateKey {
-                passphrase,
-                passphrase_ref,
-                ..
-            } => {
-                assert!(passphrase.is_none());
-                assert_eq!(
-                    passphrase_ref.as_deref(),
-                    Some("vpscope://credential/host-1/passphrase")
-                );
-                assert_eq!(
-                    state
-                        .credential_store
-                        .get_passphrase(passphrase_ref.as_deref().unwrap())
-                        .expect("stored passphrase"),
-                    "new-passphrase"
-                );
-            }
-            _ => panic!("expected private key auth"),
-        }
     }
 }

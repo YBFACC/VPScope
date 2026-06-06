@@ -211,9 +211,7 @@ impl OpenSshClient {
             .server_alive_interval(std::time::Duration::from_secs(15));
 
         match &host.auth {
-            HostAuth::Password { username, .. }
-            | HostAuth::PrivateKey { username, .. }
-            | HostAuth::SshAgent { username } => {
+            HostAuth::PrivateKey { username, .. } | HostAuth::SshAgent { username } => {
                 builder.user(username.clone());
             }
         }
@@ -259,25 +257,9 @@ impl OpenSshClient {
 
     fn session_signature(host: &HostConfig) -> String {
         let auth = match &host.auth {
-            HostAuth::Password {
-                username,
-                password_ref,
-                ..
-            } => format!(
-                "password:{username}:{}",
-                password_ref.as_deref().unwrap_or_default()
-            ),
-            HostAuth::PrivateKey {
-                username,
-                key_path,
-                key_ref,
-                passphrase: _,
-                passphrase_ref,
-            } => format!(
-                "private_key:{username}:{}:{}:{}",
-                key_path.as_deref().unwrap_or_default(),
-                key_ref.as_deref().unwrap_or_default(),
-                passphrase_ref.as_deref().unwrap_or_default()
+            HostAuth::PrivateKey { username, key_path } => format!(
+                "private_key:{username}:{}",
+                key_path.as_deref().unwrap_or_default()
             ),
             HostAuth::SshAgent { username } => format!("ssh_agent:{username}"),
         };

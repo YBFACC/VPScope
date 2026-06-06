@@ -424,9 +424,7 @@ fn is_same_endpoint(left: &HostConfig, right: &HostConfig) -> bool {
 
 fn auth_username(auth: &HostAuth) -> &str {
     match auth {
-        HostAuth::Password { username, .. }
-        | HostAuth::PrivateKey { username, .. }
-        | HostAuth::SshAgent { username } => username,
+        HostAuth::PrivateKey { username, .. } | HostAuth::SshAgent { username } => username,
     }
 }
 

@@ -26,9 +26,7 @@ export function HostForm({ open, onClose }: HostFormProps) {
   const [username, setUsername] = useState("");
   const [port, setPort] = useState(22);
   const [authType, setAuthType] = useState<HostAuth["type"]>("ssh_agent");
-  const [password, setPassword] = useState("");
   const [keyPath, setKeyPath] = useState("~/.ssh/id_ed25519");
-  const [passphrase, setPassphrase] = useState("");
   const [refreshIntervalMs, setRefreshIntervalMs] = useState(2_000);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<string>();
@@ -50,9 +48,7 @@ export function HostForm({ open, onClose }: HostFormProps) {
     setUsername("");
     setPort(22);
     setAuthType("ssh_agent");
-    setPassword("");
     setKeyPath("~/.ssh/id_ed25519");
-    setPassphrase("");
     setRefreshIntervalMs(2_000);
     setSshConfigHosts([]);
     setIsLoadingSshConfig(true);
@@ -97,15 +93,8 @@ export function HostForm({ open, onClose }: HostFormProps) {
             type: "private_key",
             username: username.trim(),
             keyPath,
-            passphrase: passphrase || undefined,
           }
-        : authType === "password"
-          ? {
-              type: "password",
-              username: username.trim(),
-              password: password || undefined,
-            }
-          : { type: "ssh_agent", username: username.trim() },
+        : { type: "ssh_agent", username: username.trim() },
   });
 
   function applySshConfigHost(alias: string) {
@@ -125,9 +114,7 @@ export function HostForm({ open, onClose }: HostFormProps) {
     setUsername(item.user ?? "");
     setPort(item.port);
     setAuthType("ssh_agent");
-    setPassword("");
     setKeyPath(item.identityFile ?? "");
-    setPassphrase("");
   }
 
   async function onTest() {
@@ -330,22 +317,12 @@ export function HostForm({ open, onClose }: HostFormProps) {
           <select className={inputClass} value={authType} onChange={(event) => setAuthType(event.target.value as HostAuth["type"])}>
             <option value="ssh_agent">{t("authAgent")}</option>
             <option value="private_key">{t("authKey")}</option>
-            <option value="password">{t("authPassword")}</option>
           </select>
         </div>
         {authType === "private_key" ? (
           <div className="grid gap-1">
-            <div className="grid min-w-0 grid-cols-2 gap-2">
-              <input className={inputClass} value={keyPath} onChange={(event) => setKeyPath(event.target.value)} aria-label={t("identityFile")} placeholder={t("identityFile")} />
-              <input className={inputClass} value={passphrase} onChange={(event) => setPassphrase(event.target.value)} aria-label={t("passphrase")} placeholder={t("passphrase")} type="password" autoComplete="new-password" />
-            </div>
-            <p className="truncate text-[10px] uppercase text-[var(--color-text-muted)]">{t("keychainPassphraseHint")}</p>
-          </div>
-        ) : null}
-        {authType === "password" ? (
-          <div className="grid gap-1">
-            <input className={inputClass} value={password} onChange={(event) => setPassword(event.target.value)} aria-label={t("password")} placeholder={t("password")} type="password" autoComplete="new-password" />
-            <p className="truncate text-[10px] uppercase text-[var(--color-text-muted)]">{t("keychainPasswordHint")}</p>
+            <input className={inputClass} value={keyPath} onChange={(event) => setKeyPath(event.target.value)} aria-label={t("identityFile")} placeholder={t("identityFile")} />
+            <p className="truncate text-[10px] uppercase text-[var(--color-text-muted)]">{t("passwordlessKeyHint")}</p>
           </div>
         ) : null}
         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2">

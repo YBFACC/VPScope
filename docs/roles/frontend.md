@@ -357,9 +357,8 @@ Host 管理界面包含：
 - 地址
 - 端口，默认 22
 - 用户名
-- 认证方式：ssh-agent/password/private key
-- password 只在用户选择 password auth 时显示
-- key path 和 passphrase 只在用户选择 private key auth 时显示
+- 认证方式：ssh-agent/private key
+- key path 只在用户选择 private key auth 时显示
 - refresh interval
 - tags
 
@@ -369,13 +368,13 @@ Host 管理界面包含：
 - 测试连接时显示 loading。
 - host key unknown 时打开确认弹窗，展示 fingerprint。
 - 保存成功后自动选中新 host。
-- password 和 private key passphrase 文案必须说明它们会写入 macOS Keychain，普通配置只保存 credential ref。
+- private key 文案必须说明密钥需要已可被系统 OpenSSH、ssh-agent 或系统 Keychain 无交互使用。
 
 验收：
 
 - 使用 mock client 时可以完整走 SSH config 导入、测试、保存、选中的流程。
 - 无 SSH config 条目时可以进入高级手动配置。
-- 高级手动配置仍可创建 password/private key profile，且只在对应认证方式下展示 secret 输入项。
+- 高级手动配置可创建 ssh-agent/private key profile，且不展示 password 或 passphrase secret 输入项。
 
 ### Step 9: 接入实时指标
 

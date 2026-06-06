@@ -38,20 +38,9 @@ export type AppError = {
 
 export type HostAuth =
   | {
-      type: "password";
-      username: string;
-      // request-only; never serialized in HostConfig responses or hosts.json
-      password?: string;
-      passwordRef?: string;
-    }
-  | {
       type: "private_key";
       username: string;
       keyPath?: string;
-      keyRef?: string;
-      // request-only; never serialized in HostConfig responses or hosts.json
-      passphrase?: string;
-      passphraseRef?: string;
     }
   | {
       type: "ssh_agent";
@@ -246,7 +235,7 @@ type HostSshConfigListResult = SshConfigHost[];
 
 ### `host_create`
 
-用途：新增服务器配置，并把敏感凭据写入 Keychain。
+用途：新增 password-less SSH 服务器配置。MVP 只支持 `ssh_agent` 和可由系统 OpenSSH/ssh-agent 无交互使用的 `private_key`。
 
 请求：
 
@@ -269,12 +258,12 @@ type HostCreateResult = HostConfig;
 
 规则：
 
-- `auth.password` 和 `auth.passphrase` 只允许作为一次性请求字段。后端必须立即写入 macOS Keychain，并在返回的 `HostConfig` 与 `hosts.json` 中只保留 `passwordRef` / `passphraseRef`。
-- `credentialRef` 格式固定为 `vpscope://credential/{hostId}/password` 或 `vpscope://credential/{hostId}/passphrase`。
+- 后端不得接受 `password`、`passwordRef`、`passphrase`、`passphraseRef` 或 `keyRef` 字段；旧配置或请求携带这些字段时返回 `CONFIG_INVALID`。
+- VPScope 不保存、不读取密码或私钥口令；加密私钥的解锁必须由系统 OpenSSH、`ssh-agent` 或系统 Keychain 处理。
 
 ### `host_update`
 
-用途：更新服务器配置。敏感字段为空时表示保持原凭据。
+用途：更新 password-less SSH 服务器配置。
 
 请求：
 
@@ -293,9 +282,8 @@ type HostUpdateResult = HostConfig;
 
 规则：
 
-- `patch.auth.password` 或 `patch.auth.passphrase` 缺省时表示保留同类型旧凭据 ref。
-- 提供新的明文 secret 时，后端覆盖对应 Keychain entry，并返回新的 ref。
-- 认证类型切换后，后端必须清理该 host 已不再使用的 Keychain 凭据。
+- `patch.auth` 只能更新为 `ssh_agent` 或 `private_key`。
+- 后端不得接受 app-managed credential 字段；旧配置或请求携带这些字段时返回 `CONFIG_INVALID`。
 
 ### `host_reorder`
 
@@ -323,7 +311,7 @@ type HostReorderResult = HostConfig[];
 
 ### `host_delete`
 
-用途：删除服务器配置，并清理关联凭据。
+用途：删除服务器配置，并清理关联的普通偏好引用。
 
 请求：
 
@@ -343,7 +331,7 @@ type HostDeleteResult = {
 
 ### `host_open_terminal`
 
-用途：为已保存 host 打开一个本机 macOS 终端，并在终端中启动受控 SSH 会话。前端只传 `hostId`；后端从 `HostConfig` 读取用户名、地址、端口和可选 `keyPath` 生成 `ssh` 命令。该命令不读取、不传递、不打印密码、私钥内容、passphrase 或 credential refs，也不允许前端传入任意 shell 字符串。
+用途：为已保存 host 打开一个本机 macOS 终端，并在终端中启动受控 SSH 会话。前端只传 `hostId`；后端从 `HostConfig` 读取用户名、地址、端口和可选 `keyPath` 生成 `ssh` 命令。该命令不读取、不传递、不打印密码、私钥内容或 passphrase，也不允许前端传入任意 shell 字符串。
 
 请求：
 
@@ -523,7 +511,9 @@ type TraySettings = {
 请求：
 
 ```ts
-type TraySettingsUpdatePayload = TraySettings;
+type TraySettingsUpdatePayload = {
+  settings: TraySettings;
+};
 ```
 
 响应：
@@ -698,7 +688,7 @@ payload:
 
 前端根据 `AppError.code` 做稳定展示：
 
-- `SSH_AUTH_FAILED`: 显示“认证失败”，引导用户检查密码、密钥或 passphrase。
+- `SSH_AUTH_FAILED`: 显示“认证失败”，引导用户检查 ssh-agent、系统 SSH 配置或密钥文件是否可无交互认证。
 - `SSH_CONNECT_FAILED`: 显示“连接失败”，展示 address、port 和 retry。
 - `SSH_HOST_KEY_UNKNOWN`: 弹出 fingerprint 确认。
 - `SSH_HOST_KEY_CHANGED`: 强警告，需要用户重新确认，不自动连接。

@@ -6,26 +6,14 @@ pub type HostId = String;
 #[serde(
     tag = "type",
     rename_all = "snake_case",
-    rename_all_fields = "camelCase"
+    rename_all_fields = "camelCase",
+    deny_unknown_fields
 )]
 pub enum HostAuth {
-    Password {
-        username: String,
-        #[serde(default, skip_serializing)]
-        password: Option<String>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        password_ref: Option<String>,
-    },
     PrivateKey {
         username: String,
         #[serde(skip_serializing_if = "Option::is_none")]
         key_path: Option<String>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        key_ref: Option<String>,
-        #[serde(default, skip_serializing)]
-        passphrase: Option<String>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        passphrase_ref: Option<String>,
     },
     SshAgent {
         username: String,
@@ -33,7 +21,7 @@ pub enum HostAuth {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct HostConfig {
     pub id: HostId,
     pub name: String,
@@ -47,7 +35,7 @@ pub struct HostConfig {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct HostCreatePayload {
     pub name: String,
     pub address: String,
@@ -59,7 +47,7 @@ pub struct HostCreatePayload {
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct HostPatch {
     pub name: Option<String>,
     pub address: Option<String>,
@@ -70,20 +58,20 @@ pub struct HostPatch {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct HostUpdatePayload {
     pub id: HostId,
     pub patch: HostPatch,
 }
 
 #[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct HostReorderPayload {
     pub ordered_host_ids: Vec<HostId>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct HostDeletePayload {
     pub id: HostId,
 }
@@ -92,4 +80,33 @@ pub struct HostDeletePayload {
 #[serde(rename_all = "camelCase")]
 pub struct OkResult {
     pub ok: bool,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn deserializes_passwordless_host_auth() {
+        let agent: HostAuth = serde_json::from_str(r#"{"type":"ssh_agent","username":"ubuntu"}"#)
+            .expect("ssh agent auth");
+        assert!(matches!(agent, HostAuth::SshAgent { .. }));
+
+        let key: HostAuth = serde_json::from_str(
+            r#"{"type":"private_key","username":"ubuntu","keyPath":"~/.ssh/id_ed25519"}"#,
+        )
+        .expect("private key auth");
+        assert!(matches!(key, HostAuth::PrivateKey { .. }));
+    }
+
+    #[test]
+    fn rejects_legacy_app_managed_auth_fields() {
+        for value in [
+            r#"{"type":"password","username":"ubuntu","passwordRef":"vpscope://credential/host/password"}"#,
+            r#"{"type":"private_key","username":"ubuntu","keyPath":"~/.ssh/id_ed25519","passphraseRef":"vpscope://credential/host/passphrase"}"#,
+            r#"{"type":"private_key","username":"ubuntu","keyPath":"~/.ssh/id_ed25519","keyRef":"vpscope://credential/host/key"}"#,
+        ] {
+            serde_json::from_str::<HostAuth>(value).expect_err("legacy auth must be invalid");
+        }
+    }
 }

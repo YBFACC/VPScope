@@ -18,9 +18,9 @@ VPScope 是一个面向 macOS 的 VPS 监控桌面应用。它追求接近 `btop
 VPScope 面向需要长时间观察 VPS 状态的开发者和运维使用场景：
 
 - 高密度、可扫视的监控界面，而不是营销型 dashboard。
-- macOS-first，优先做好桌面常驻、主机切换、托盘状态和本地安全存储。
+- macOS-first，优先做好桌面常驻、主机切换、托盘状态和系统 SSH 工作流复用。
 - agentless SSH，主路径只读导入已有 `~/.ssh/config`，复用系统 `ssh-agent`、Keychain、SSH key 和 alias 工作流。
-- 前后端边界清晰：前端负责 UI、状态和交互；Rust 后端负责 SSH、配置、凭据、解析、调度和事件流。
+- 前后端边界清晰：前端负责 UI、状态和交互；Rust 后端负责 SSH、配置、解析、调度和事件流。
 - 主题驱动设计：核心颜色、边框、状态色、图表色和密度规则来自 token，不在业务组件里硬编码。
 
 MVP 明确不做破坏性远程操作，例如 kill、restart、delete、service control；也不把 Docker、Kubernetes、GPU、历史数据库或复杂告警系统作为当前范围。
@@ -33,7 +33,7 @@ MVP 明确不做破坏性远程操作，例如 kill、restart、delete、service
 - 多主机 Overview：按主机快速扫视健康状态、CPU/内存/磁盘占用、网络吞吐和连接状态。
 - 主机管理：保存长期 SSH profile、从 `~/.ssh/config` 导入 alias、连接测试、连接状态、错误态和部分数据失败状态。
 - 数据链路：通过 `/proc`、`df -P`、`ps` 等只读来源采集 Linux 指标。
-- 安全存储：默认复用系统 SSH/Keychain；只有用户显式选择 app-managed password 或 private key passphrase 时，敏感值才会写入 macOS Keychain，普通 host 配置只保存 `vpscope://credential/...` 引用。
+- SSH 认证：MVP 只支持 password-less OpenSSH 路径，复用 `~/.ssh/config` alias、`ssh-agent`、系统 Keychain 和可无交互使用的 key file。
 - 桌面体验：Tauri 应用壳、托盘常驻、设置页、通知能力、主题切换和 macOS 构建流程。
 - Mock 模式：前端可以脱离真实 Tauri/Rust 后端独立开发和预览。
 
@@ -48,7 +48,7 @@ MVP 明确不做破坏性远程操作，例如 kill、restart、delete、service
 - State: `Zustand`
 - Virtualized list: `@tanstack/react-virtual`
 - SSH: Rust 层通过 `openssh` 维护连接与采集
-- Credential storage: Rust 层通过 `keyring` 的 Apple native backend 接入 macOS Keychain
+- SSH auth: Rust 层通过系统 OpenSSH password-less 认证路径建立连接
 
 ## 目录结构
 
@@ -123,7 +123,7 @@ React UI
   -> frontend client abstraction
   -> Tauri commands / events
 Rust app core
-  -> host config / credentials / SSH / parsers / metrics scheduler
+  -> host config / SSH / parsers / metrics scheduler
 Remote VPS
   -> /proc + fixed read-only commands
 ```
@@ -135,8 +135,8 @@ Remote VPS
 - 前端不能传入任意 shell 命令字符串。
 - 远程采集只使用固定的只读命令和 `/proc` 数据源。
 - VPScope 只读导入用户的 `~/.ssh/config`，不会自动改写 SSH 配置；导入时保存 alias 作为 host profile 的名称和地址，以最大程度复用系统 OpenSSH 行为。
-- 敏感值不能存进普通 JSON/TOML 配置文件；`auth.password` 和 `auth.passphrase` 只作为一次性请求字段进入后端，后端立即写入 macOS Keychain，并在返回值和 `hosts.json` 中只保留 `passwordRef` / `passphraseRef`。
-- 删除 host 或切换认证类型时，后端会清理该 host 已不再使用的 Keychain 凭据。
+- VPScope 不保存、不读取 password 或 private key passphrase；加密私钥解锁由系统 OpenSSH、`ssh-agent` 或系统 Keychain 处理。
+- 旧 app-managed credential 字段不属于当前契约；读取或提交这类字段时应返回 `CONFIG_INVALID`。
 - 命令、事件、数据结构或错误码发生变化时，必须同步更新契约文档、前端类型、Rust serde 结构、mock 数据和测试。
 
 ## 文档入口

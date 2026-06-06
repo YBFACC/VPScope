@@ -54,7 +54,7 @@ VPScope 是一个用于监控本机和远程 VPS 资源使用情况的 macOS 桌
   - 表格虚拟滚动：TanStack Virtual
 - Local storage:
   - 配置：Tauri app config dir 中的 JSON/TOML
-  - 凭据：macOS Keychain
+  - 凭据：MVP 复用系统 OpenSSH、ssh-agent 和系统 Keychain，不做 app-managed credential store
   - 历史指标：SQLite，可作为第二阶段
 - SSH:
   - Rust 层实现 session manager
@@ -132,9 +132,8 @@ src-tauri/
 - host
 - port
 - username
-- auth type: password / private key / ssh-agent
-- key path 或 key 内容
-- passphrase
+- auth type: private key / ssh-agent
+- key path
 - known_hosts 策略
 - refresh interval
 
@@ -365,9 +364,9 @@ SSH 和系统命令是本项目的主要风险点。
 - 前端只能调用受控 Tauri command。
 - Tauri capability 只开放必要命令。
 - Rust 层维护命令白名单。
-- 默认复用系统 SSH/Keychain；只有用户显式选择 app-managed password 或 private key passphrase 时，凭据才存 macOS Keychain，不落普通配置文件。
-- MVP 当前通过 Rust `keyring` 的 Apple native backend 写入 macOS Keychain；host 配置文件只保存 `vpscope://credential/{host_id}/password` 或 `vpscope://credential/{host_id}/passphrase` 引用。
-- private key passphrase 不写日志。
+- 默认复用系统 SSH、ssh-agent、系统 Keychain 和 `~/.ssh/config`。
+- MVP 不实现 app-managed password 或 private key passphrase；host 配置文件只保存 password-less auth 所需的 username、address、port 和可选 key path。
+- password、private key 内容和 passphrase 不写日志，也不进入 VPScope 配置。
 - `~/.ssh/config` 只读导入，不读取私钥内容，不自动改写用户 SSH 配置。
 - known_hosts 默认严格校验，首次连接需要用户确认 fingerprint。
 - 所有远程命令只读，危险操作不进入 MVP。
@@ -426,7 +425,7 @@ alert_settings_update
 - macOS Tauri app scaffold。
 - React + Tailwind CSS + theme token 系统。
 - Host 管理：导入 `~/.ssh/config` alias 保存长期 SSH profile、编辑、删除、测试 SSH。
-- SSH config/ssh-agent 主路径，password/private key passphrase 作为 app-managed Keychain 高级兜底。
+- SSH config/ssh-agent 主路径，private key 只支持系统 OpenSSH 可无交互使用的 key file。
 - 单 host 实时 dashboard。
 - CPU、内存、磁盘、网络、进程列表。
 - 主题切换：至少 2 个内置 theme。
@@ -464,7 +463,7 @@ alert_settings_update
 - 实现 host 配置模型。
 - 实现 SSH 测试连接。
 - 实现 known_hosts/fingerprint 确认流程。
-- 凭据接入 macOS Keychain，新增/更新 host 时明文 password/passphrase 只作为一次性请求字段，返回和磁盘配置只保留 credential ref。
+- 明确 password-less 认证边界：新增/更新 host 不接受 password、passphrase、credential ref 或 private key 内容。
 
 验收：
 
@@ -533,7 +532,7 @@ pnpm tauri dev
 ## 后续决策点
 
 - SSH Rust crate 选型：MVP 已采用 `openssh` + `native-mux`。后续只有在需要去掉系统 `ssh` 依赖、进一步压低连接开销或增强 host key/agent 控制时，再评估 `russh`、`ssh2`。
-- 凭据存储：MVP 已采用 macOS Keychain。后续只有在需要跨平台统一加密存储或迁移策略时，再评估 Tauri plugin stronghold。
+- 凭据存储：MVP 不做 app-managed credential store。后续只有在明确要支持 password-only VPS 或 app-managed passphrase 时，再重新评估 SSH 栈和 Tauri plugin stronghold。
 - 图表实现：SVG 是否足够，还是第一版直接 Canvas。
 - 是否从 MVP 就支持多 host 总览。
 - 是否支持导入 `~/.ssh/config`。

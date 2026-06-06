@@ -20,18 +20,9 @@ export type AppError = {
 
 export type HostAuth =
   | {
-      type: "password";
-      username: string;
-      password?: string;
-      passwordRef?: string;
-    }
-  | {
       type: "private_key";
       username: string;
       keyPath?: string;
-      keyRef?: string;
-      passphrase?: string;
-      passphraseRef?: string;
     }
   | {
       type: "ssh_agent";
@@ -178,6 +169,10 @@ export type TraySettings = {
   items: TraySettingsItem[];
 };
 
+export type TraySettingsUpdatePayload = {
+  settings: TraySettings;
+};
+
 export type AlertMetric = "cpu";
 
 export type AlertRule = {
@@ -193,6 +188,14 @@ export type AlertRule = {
 
 export type AlertSettings = {
   rules: AlertRule[];
+};
+
+export type AlertSettingsUpdatePayload = {
+  settings: AlertSettings;
+};
+
+export type TerminalSettingsUpdatePayload = {
+  settings: TerminalSettings;
 };
 
 export type ProcessListPayload = {
@@ -288,11 +291,11 @@ export type VpscopeCommandPayloads = {
   metrics_unsubscribe: MetricsUnsubscribePayload;
   process_list: ProcessListPayload;
   tray_settings_get: Record<string, never>;
-  tray_settings_update: TraySettings;
+  tray_settings_update: TraySettingsUpdatePayload;
   alert_settings_get: Record<string, never>;
-  alert_settings_update: { settings: AlertSettings };
+  alert_settings_update: AlertSettingsUpdatePayload;
   terminal_settings_get: Record<string, never>;
-  terminal_settings_update: { settings: TerminalSettings };
+  terminal_settings_update: TerminalSettingsUpdatePayload;
 };
 
 export type VpscopeCommandResults = {
@@ -316,3 +319,15 @@ export type VpscopeCommandResults = {
   terminal_settings_get: TerminalSettings;
   terminal_settings_update: TerminalSettings;
 };
+
+type ContractEqual<Left, Right> =
+  (<Value>() => Value extends Left ? 1 : 2) extends <Value>() => Value extends Right ? 1 : 2
+    ? true
+    : false;
+type ContractAssert<Condition extends true> = Condition;
+
+type _SettingsCommandPayloadSmoke = [
+  ContractAssert<ContractEqual<VpscopeCommandPayloads["tray_settings_update"], TraySettingsUpdatePayload>>,
+  ContractAssert<ContractEqual<VpscopeCommandPayloads["alert_settings_update"], AlertSettingsUpdatePayload>>,
+  ContractAssert<ContractEqual<VpscopeCommandPayloads["terminal_settings_update"], TerminalSettingsUpdatePayload>>,
+];
