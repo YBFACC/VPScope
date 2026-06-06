@@ -1,6 +1,13 @@
 use crate::config::HostId;
 use serde::Serialize;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SampleState {
+    Warming,
+    Live,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SystemInfo {
@@ -86,6 +93,7 @@ pub struct ProcessInfo {
 pub struct HostSnapshot {
     pub host_id: HostId,
     pub ts: u64,
+    pub sample_state: SampleState,
     pub system: SystemInfo,
     pub cpu: CpuInfo,
     pub memory: MemoryInfo,

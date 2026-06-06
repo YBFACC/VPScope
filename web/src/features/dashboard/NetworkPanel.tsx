@@ -89,7 +89,10 @@ export function NetworkPanel({ snapshot, networkByInterface }: NetworkPanelProps
   const txHistory = selectedHistory?.tx ?? [];
   const rxValues = rxHistory.map((point) => point.value);
   const txValues = txHistory.map((point) => point.value);
-  const currentMaxRate = Math.max(currentInterface?.rxBytesPerSec ?? 0, currentInterface?.txBytesPerSec ?? 0);
+  const isLiveSample = snapshot.sampleState === "live";
+  const currentMaxRate = isLiveSample
+    ? Math.max(currentInterface?.rxBytesPerSec ?? 0, currentInterface?.txBytesPerSec ?? 0)
+    : 0;
   const maxRate = Math.max(1, historyPeak(rxHistory), historyPeak(txHistory), currentMaxRate);
   const isActive = activeDashboardPanelId === "network";
 
@@ -189,7 +192,9 @@ export function NetworkPanel({ snapshot, networkByInterface }: NetworkPanelProps
               <div className="btop-rate-box">
                 <div className="flex items-baseline justify-between gap-3">
                   <span>{t("download")}</span>
-                  <strong className="text-[var(--color-network-rx)]">{formatRate(currentInterface.rxBytesPerSec)}</strong>
+                  <strong className="text-[var(--color-network-rx)]">
+                    {isLiveSample ? formatRate(currentInterface.rxBytesPerSec) : "--"}
+                  </strong>
                 </div>
                 <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
                   <span className="text-[var(--color-text-muted)]">{t("peak")}</span>
@@ -202,7 +207,9 @@ export function NetworkPanel({ snapshot, networkByInterface }: NetworkPanelProps
               <div className="btop-rate-box">
                 <div className="flex items-baseline justify-between gap-3">
                   <span>{t("upload")}</span>
-                  <strong className="text-[var(--color-network-tx)]">{formatRate(currentInterface.txBytesPerSec)}</strong>
+                  <strong className="text-[var(--color-network-tx)]">
+                    {isLiveSample ? formatRate(currentInterface.txBytesPerSec) : "--"}
+                  </strong>
                 </div>
                 <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
                   <span className="text-[var(--color-text-muted)]">{t("peak")}</span>
@@ -214,7 +221,7 @@ export function NetworkPanel({ snapshot, networkByInterface }: NetworkPanelProps
               <div className="btop-rate-box flex items-center justify-between gap-3">
                 <span className="text-[var(--color-text-muted)]">{t("trafficSplit")}</span>
                 <span className="text-[var(--color-accent)] tabular-nums">
-                  {formatRate(currentInterface.rxBytesPerSec + currentInterface.txBytesPerSec)}
+                  {isLiveSample ? formatRate(currentInterface.rxBytesPerSec + currentInterface.txBytesPerSec) : "--"}
                 </span>
               </div>
             </div>

@@ -20,6 +20,12 @@ export function evaluateCpuAlert(
   snapshot: HostSnapshot,
   previous: AlertRuntimeState | undefined,
 ): { next: AlertRuntimeState; trigger?: AlertTrigger } {
+  if (snapshot.sampleState !== "live") {
+    return {
+      next: previous ?? { aboveThreshold: false },
+    };
+  }
+
   const value = snapshot.cpu.totalPercent;
   const aboveThreshold = rule.enabled && value >= rule.thresholdPercent;
   const lastTriggeredAt = previous?.lastTriggeredAt;

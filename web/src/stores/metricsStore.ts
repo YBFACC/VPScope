@@ -53,32 +53,37 @@ const emptyHistory = (): MetricHistory => ({
 
 function nextHistory(previous: MetricHistory | undefined, snapshot: HostSnapshot) {
   const history = previous ?? emptyHistory();
+  const isLiveSample = snapshot.sampleState === "live";
   const memoryPercent =
     snapshot.memory.totalBytes > 0 ? (snapshot.memory.usedBytes / snapshot.memory.totalBytes) * 100 : 0;
-  const nextNetworkByInterface = Object.fromEntries(
-    snapshot.network.map((iface) => {
-      const previousInterfaceHistory = history.networkByInterface[iface.iface];
+  const nextNetworkByInterface = isLiveSample
+    ? Object.fromEntries(
+        snapshot.network.map((iface) => {
+          const previousInterfaceHistory = history.networkByInterface[iface.iface];
 
-      return [
-        iface.iface,
-        {
-          rx: pushHistory(
-            previousInterfaceHistory?.rx ?? [],
-            { ts: snapshot.ts, value: iface.rxBytesPerSec },
-            HISTORY_LIMIT,
-          ),
-          tx: pushHistory(
-            previousInterfaceHistory?.tx ?? [],
-            { ts: snapshot.ts, value: iface.txBytesPerSec },
-            HISTORY_LIMIT,
-          ),
-        },
-      ] satisfies [string, NetworkInterfaceHistory];
-    }),
-  );
+          return [
+            iface.iface,
+            {
+              rx: pushHistory(
+                previousInterfaceHistory?.rx ?? [],
+                { ts: snapshot.ts, value: iface.rxBytesPerSec },
+                HISTORY_LIMIT,
+              ),
+              tx: pushHistory(
+                previousInterfaceHistory?.tx ?? [],
+                { ts: snapshot.ts, value: iface.txBytesPerSec },
+                HISTORY_LIMIT,
+              ),
+            },
+          ] satisfies [string, NetworkInterfaceHistory];
+        }),
+      )
+    : history.networkByInterface;
 
   return {
-    cpu: pushHistory(history.cpu, { ts: snapshot.ts, value: snapshot.cpu.totalPercent }, HISTORY_LIMIT),
+    cpu: isLiveSample
+      ? pushHistory(history.cpu, { ts: snapshot.ts, value: snapshot.cpu.totalPercent }, HISTORY_LIMIT)
+      : history.cpu,
     memory: pushHistory(history.memory, { ts: snapshot.ts, value: memoryPercent }, HISTORY_LIMIT),
     networkByInterface: nextNetworkByInterface,
   };

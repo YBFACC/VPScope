@@ -104,9 +104,12 @@ export type ProcessInfo = {
   startedAt?: number;
 };
 
+export type SampleState = "warming" | "live";
+
 export type HostSnapshot = {
   hostId: HostId;
   ts: number;
+  sampleState: SampleState;
   system: {
     hostname: string;
     os: string;
@@ -190,6 +193,13 @@ export type AlertSettings = {
 ```
 
 `disks` 表示适合监控展示的文件系统挂载，不是 `df -P` 的原始全量输出。后端应过滤 `tmpfs`、`devtmpfs`、`efivarfs`、`proc`、`sysfs`、`cgroup*`、`overlay` 等虚拟或运行时文件系统，以及 `/proc`、`/sys`、`/run`、`/dev` 下的运行时挂载。
+
+`sampleState` 表示当前采样是否已有上一帧 counter：
+
+- `warming`: 当前 collector 还没有上一帧 counter。`cpu.totalPercent`、`cpu.cores[].percent`、`network[].rxBytesPerSec`、`network[].txBytesPerSec`、`disks[].readBytesPerSec`、`disks[].writeBytesPerSec` 不是有效 delta 值，前端不能把它们当作真实 `0` 写入历史或展示为真实 rate。
+- `live`: collector 已有上一帧 counter，CPU/network/disk IO delta 指标可展示并写入历史。
+
+`warming` 样本仍可携带 system、memory、disk capacity、network total counters 和 process 等非 delta 信息，用于避免首次采集时 UI 空白。
 
 ## Tauri Commands
 

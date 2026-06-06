@@ -183,13 +183,13 @@ function healthFor(snapshot: HostSnapshot | undefined, connection?: HostConnecti
 
   const memoryPercent = safePercent(snapshot.memory.usedBytes, snapshot.memory.totalBytes) ?? 0;
   const diskPercent = maxDiskPercent(snapshot) ?? 0;
-  const cpuPercent = snapshot.cpu.totalPercent;
+  const cpuPercent = snapshot.sampleState === "live" ? snapshot.cpu.totalPercent : undefined;
 
-  if (cpuPercent >= 90 || memoryPercent >= 90 || diskPercent >= 90) {
+  if ((cpuPercent !== undefined && cpuPercent >= 90) || memoryPercent >= 90 || diskPercent >= 90) {
     return "hot";
   }
 
-  if (cpuPercent >= 75 || memoryPercent >= 75 || diskPercent >= 80) {
+  if ((cpuPercent !== undefined && cpuPercent >= 75) || memoryPercent >= 75 || diskPercent >= 80) {
     return "warn";
   }
 
@@ -356,11 +356,12 @@ export function OverviewPage({
               ? safePercent(snapshot.memory.usedBytes, snapshot.memory.totalBytes)
               : undefined;
             const diskPercent = maxDiskPercent(snapshot);
-            const rx = sumNetwork(snapshot, "rxBytesPerSec");
-            const tx = sumNetwork(snapshot, "txBytesPerSec");
+            const isLiveSample = snapshot?.sampleState === "live";
+            const rx = isLiveSample ? sumNetwork(snapshot, "rxBytesPerSec") : 0;
+            const tx = isLiveSample ? sumNetwork(snapshot, "txBytesPerSec") : 0;
             const history = histories[host.id];
-            const rxHistory = aggregateNetworkHistory(history, "rx", snapshot ? rx : undefined);
-            const txHistory = aggregateNetworkHistory(history, "tx", snapshot ? tx : undefined);
+            const rxHistory = aggregateNetworkHistory(history, "rx", isLiveSample ? rx : undefined);
+            const txHistory = aggregateNetworkHistory(history, "tx", isLiveSample ? tx : undefined);
             const health = healthFor(snapshot, connection, error);
             const healthTone = healthColor(health);
 
@@ -404,8 +405,8 @@ export function OverviewPage({
 
                 <MetricCell
                   label={t("cpu")}
-                  value={snapshot ? formatPercent(snapshot.cpu.totalPercent) : "--"}
-                  meter={snapshot?.cpu.totalPercent}
+                  value={isLiveSample && snapshot ? formatPercent(snapshot.cpu.totalPercent) : "--"}
+                  meter={isLiveSample ? snapshot?.cpu.totalPercent : undefined}
                   color="var(--color-cpu)"
                 />
                 <MetricCell
@@ -424,8 +425,8 @@ export function OverviewPage({
                   label={t("network")}
                   rxLabel={t("rx")}
                   txLabel={t("tx")}
-                  rxValue={snapshot ? formatRate(rx) : "--"}
-                  txValue={snapshot ? formatRate(tx) : "--"}
+                  rxValue={isLiveSample ? formatRate(rx) : "--"}
+                  txValue={isLiveSample ? formatRate(tx) : "--"}
                   peakLabel={t("peak")}
                   rxHistory={rxHistory}
                   txHistory={txHistory}

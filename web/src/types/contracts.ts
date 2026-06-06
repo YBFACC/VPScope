@@ -221,9 +221,12 @@ export type ProcessInfo = {
   startedAt?: number;
 };
 
+export type SampleState = "warming" | "live";
+
 export type HostSnapshot = {
   hostId: HostId;
   ts: number;
+  sampleState: SampleState;
   system: {
     hostname: string;
     os: string;

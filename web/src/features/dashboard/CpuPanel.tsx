@@ -23,9 +23,11 @@ function formatUptime(totalSeconds: number) {
 export function CpuPanel({ snapshot, history }: CpuPanelProps) {
   const { t } = useI18n();
   const historyValues = history.map((point) => point.value);
+  const isLiveSample = snapshot.sampleState === "live";
+  const cpuStatus = isLiveSample ? formatPercent(snapshot.cpu.totalPercent) : "--";
 
   return (
-    <MetricPanel panelId="cpu" title={t("cpu")} accent="var(--color-cpu)" status={formatPercent(snapshot.cpu.totalPercent)} collapsed={false}>
+    <MetricPanel panelId="cpu" title={t("cpu")} accent="var(--color-cpu)" status={cpuStatus} collapsed={false}>
       <div className="btop-cpu-grid">
         <div className="btop-cpu-chart">
           <DotMatrixChart
@@ -43,7 +45,7 @@ export function CpuPanel({ snapshot, history }: CpuPanelProps) {
         <div className="btop-cpu-side">
           <div className="btop-side-title">
             <span>{snapshot.system.hostname}</span>
-            <span>{Math.round(snapshot.cpu.totalPercent)}</span>
+            <span>{isLiveSample ? Math.round(snapshot.cpu.totalPercent) : "--"}</span>
           </div>
           <TerminalMeter label="CPU" value={snapshot.cpu.totalPercent} color="var(--color-cpu)" toneScale="cpu" />
           {snapshot.cpu.cores.slice(0, 8).map((core) => (

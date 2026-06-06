@@ -28,6 +28,7 @@ function processRow(index: number): ProcessInfo {
 export const idleHost: HostSnapshot = {
   hostId: "mock-idle-ubuntu",
   ts: baseTs,
+  sampleState: "live",
   system: {
     hostname: "idle-vps",
     os: "Ubuntu 22.04.4 LTS",
@@ -91,6 +92,7 @@ export const idleHost: HostSnapshot = {
 export const busyHost: HostSnapshot = {
   hostId: "mock-busy-ubuntu",
   ts: baseTs + 2_000,
+  sampleState: "live",
   system: {
     hostname: "build-runner-01",
     os: "Ubuntu 24.04.1 LTS",
@@ -175,6 +177,7 @@ export const busyHost: HostSnapshot = {
 export const errorHost: HostSnapshot = {
   hostId: "mock-error-degraded",
   ts: baseTs + 4_000,
+  sampleState: "live",
   system: {
     hostname: "unknown",
     os: "remote unsupported",
@@ -196,6 +199,23 @@ export const errorHost: HostSnapshot = {
   disks: [],
   network: [],
   processes: [],
+};
+
+export const warmingHost: HostSnapshot = {
+  ...idleHost,
+  hostId: "mock-warming-ubuntu",
+  ts: baseTs + 6_000,
+  sampleState: "warming",
+  cpu: {
+    totalPercent: 0,
+    cores: idleHost.cpu.cores.map((core) => ({ ...core, percent: 0 })),
+  },
+  network: idleHost.network.map((iface) => ({
+    ...iface,
+    rxBytesPerSec: 0,
+    txBytesPerSec: 0,
+  })),
+  processes: idleHost.processes.map((process) => ({ ...process })),
 };
 
 export const mockConnectionStates: HostConnectionState[] = [
@@ -239,6 +259,7 @@ export const mockSnapshots = {
   idleHost,
   busyHost,
   errorHost,
+  warmingHost,
 };
 
 export const mockSnapshot = idleHost;
@@ -255,6 +276,7 @@ export function createMockSnapshot(hostId: string): HostSnapshot {
     ...source,
     hostId,
     ts: Date.now(),
+    sampleState: source.sampleState,
     system: { ...source.system },
     cpu: {
       totalPercent: source.cpu.totalPercent,

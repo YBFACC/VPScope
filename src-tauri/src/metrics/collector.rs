@@ -2,7 +2,8 @@ use crate::{
     config::HostConfig,
     errors::AppError,
     metrics::snapshot::{
-        CpuCore, CpuInfo, DiskInfo, HostSnapshot, MemoryInfo, NetworkInfo, ProcessInfo, SystemInfo,
+        CpuCore, CpuInfo, DiskInfo, HostSnapshot, MemoryInfo, NetworkInfo, ProcessInfo,
+        SampleState, SystemInfo,
     },
     parsers::{
         cpu::{parse_proc_stat, CpuSample},
@@ -106,6 +107,7 @@ impl MetricsCollector {
         HostSnapshot {
             host_id: host.id.clone(),
             ts,
+            sample_state: SampleState::Warming,
             system: SystemInfo {
                 hostname: host.name.clone(),
                 os: "warming".to_string(),
@@ -163,6 +165,11 @@ impl MetricsCollector {
         let network = parse_proc_net_dev(&output.net_dev)?;
         let disk_io = parse_diskstats(&output.diskstats)?;
         let previous = self.previous.as_ref();
+        let sample_state = if previous.is_some() {
+            SampleState::Live
+        } else {
+            SampleState::Warming
+        };
         let cores = cpu_samples
             .iter()
             .filter(|sample| sample.id != "cpu")
@@ -171,11 +178,16 @@ impl MetricsCollector {
                 percent: cpu_sample_percent(sample, previous),
             })
             .collect::<Vec<_>>();
-        let total_percent = cpu_samples
+        let total_sample = cpu_samples
             .iter()
             .find(|sample| sample.id == "cpu")
-            .map(|sample| cpu_sample_percent(sample, previous))
-            .unwrap_or(0.0);
+            .ok_or_else(|| {
+                AppError::new(
+                    crate::errors::AppErrorCode::ParserFailed,
+                    "Aggregate cpu row is missing from /proc/stat",
+                )
+            })?;
+        let total_percent = cpu_sample_percent(total_sample, previous);
         let network = network_rates(network, previous, ts);
         let slow = self.slow.as_ref().ok_or_else(|| {
             AppError::internal("Slow metrics cache is empty after full metrics refresh")
@@ -193,6 +205,7 @@ impl MetricsCollector {
         let snapshot = HostSnapshot {
             host_id: host.id.clone(),
             ts,
+            sample_state,
             system: SystemInfo {
                 hostname: host.name.clone(),
                 os: slow.os.clone(),
@@ -443,6 +456,7 @@ mod tests {
     struct RecordingSshClient {
         modes: Mutex<Vec<MetricsBatchMode>>,
         calls: Mutex<u64>,
+        proc_stat_override: Option<String>,
     }
 
     #[async_trait]
@@ -467,7 +481,11 @@ mod tests {
             self.modes.lock().unwrap().push(mode);
             let mut calls = self.calls.lock().unwrap();
             *calls += 1;
-            Ok(test_metrics_output(mode, *calls))
+            let mut output = test_metrics_output(mode, *calls);
+            if let Some(proc_stat) = &self.proc_stat_override {
+                output.proc_stat = proc_stat.clone();
+            }
+            Ok(output)
         }
     }
 
@@ -551,8 +569,29 @@ mod tests {
         assert_eq!(first.processes.len(), 1);
         assert_eq!(second.processes.len(), 1);
         assert_eq!(third.processes.len(), 1);
+        assert_eq!(first.sample_state, SampleState::Warming);
+        assert_eq!(second.sample_state, SampleState::Live);
         assert_eq!(second.disks[0].read_bytes_per_sec, Some(1_024.0));
         assert_eq!(second.disks[0].write_bytes_per_sec, Some(2_048.0));
+        assert!(second.cpu.total_percent > 0.0);
+    }
+
+    #[tokio::test]
+    async fn collector_reports_parser_error_when_aggregate_cpu_row_is_missing() {
+        let mut collector = MetricsCollector::new();
+        let ssh = Arc::new(RecordingSshClient {
+            proc_stat_override: Some("cpu0 10 0 0 90\n".to_string()),
+            ..RecordingSshClient::default()
+        });
+        let host = test_host();
+
+        let error = collector
+            .collect(&host, ssh, 1, CollectionProfile::Active)
+            .await
+            .expect_err("missing aggregate cpu row must fail");
+
+        assert_eq!(error.code, "PARSER_FAILED");
+        assert!(error.message.contains("Aggregate cpu row"));
     }
 
     #[tokio::test]
@@ -576,6 +615,8 @@ mod tests {
         );
         assert!(first.processes.is_empty());
         assert!(second.processes.is_empty());
+        assert_eq!(first.sample_state, SampleState::Warming);
+        assert_eq!(second.sample_state, SampleState::Live);
     }
 
     #[tokio::test]

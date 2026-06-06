@@ -26,6 +26,7 @@ function percent(usedBytes: number, totalBytes: number) {
 
 export function DiskPanel({ snapshot }: DiskPanelProps) {
   const { t } = useI18n();
+  const isLiveSample = snapshot.sampleState === "live";
   const diskItems: DiskItem[] = [
     ...snapshot.disks.map((disk) => ({
       id: disk.mount,
@@ -48,7 +49,9 @@ export function DiskPanel({ snapshot }: DiskPanelProps) {
   const worstUsedPercent = diskItems.reduce((max, disk) => Math.max(max, percent(disk.usedBytes, disk.totalBytes)), 0);
   const maxIoRate = Math.max(
     1,
-    ...diskItems.map((disk) => (disk.readBytesPerSec ?? 0) + (disk.writeBytesPerSec ?? 0)),
+    ...diskItems.map((disk) =>
+      isLiveSample ? (disk.readBytesPerSec ?? 0) + (disk.writeBytesPerSec ?? 0) : 0,
+    ),
   );
 
   return (
@@ -75,13 +78,13 @@ export function DiskPanel({ snapshot }: DiskPanelProps) {
               <TerminalMeter label="F" value={freePercent} detail={formatBytes(freeBytes)} color="var(--color-cpu)" />
               <div className="btop-io-row">
                 <span>{disk.isSwap ? "IO" : t("read")}</span>
-                <TerminalMeter value={disk.isSwap ? 0 : ((disk.readBytesPerSec ?? 0) / maxIoRate) * 100} color="var(--color-accent)" segments={PIXEL_DENSITY.meter.compactSegments} showPercent={false} />
-                <span>{disk.isSwap ? "--" : formatRate(disk.readBytesPerSec ?? 0)}</span>
+                <TerminalMeter value={disk.isSwap || !isLiveSample ? 0 : ((disk.readBytesPerSec ?? 0) / maxIoRate) * 100} color="var(--color-accent)" segments={PIXEL_DENSITY.meter.compactSegments} showPercent={false} />
+                <span>{disk.isSwap || !isLiveSample ? "--" : formatRate(disk.readBytesPerSec ?? 0)}</span>
               </div>
               <div className="btop-io-row">
                 <span>{disk.isSwap ? "" : t("write")}</span>
-                <TerminalMeter value={disk.isSwap ? 0 : ((disk.writeBytesPerSec ?? 0) / maxIoRate) * 100} color="var(--color-disk)" segments={PIXEL_DENSITY.meter.compactSegments} showPercent={false} />
-                <span>{disk.isSwap ? "" : formatRate(disk.writeBytesPerSec ?? 0)}</span>
+                <TerminalMeter value={disk.isSwap || !isLiveSample ? 0 : ((disk.writeBytesPerSec ?? 0) / maxIoRate) * 100} color="var(--color-disk)" segments={PIXEL_DENSITY.meter.compactSegments} showPercent={false} />
+                <span>{disk.isSwap ? "" : isLiveSample ? formatRate(disk.writeBytesPerSec ?? 0) : "--"}</span>
               </div>
             </div>
           );

@@ -387,6 +387,7 @@ function DashboardPanels({
   processes,
 }: DashboardPanelsProps) {
   const { t } = useI18n();
+  const cpuSummary = snapshot.sampleState === "live" ? `${Math.round(snapshot.cpu.totalPercent)}%` : "--";
   const memoryPercent = panelPercent(snapshot.memory.usedBytes, snapshot.memory.totalBytes);
   const worstDiskPercent = Math.max(
     0,
@@ -398,7 +399,7 @@ function DashboardPanels({
       id: "cpu",
       title: t("cpu"),
       accent: "var(--color-cpu)",
-      summary: `${Math.round(snapshot.cpu.totalPercent)}%`,
+      summary: cpuSummary,
       element: <CpuPanel snapshot={snapshot} history={history?.cpu ?? []} />,
     },
     {

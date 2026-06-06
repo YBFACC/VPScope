@@ -31,6 +31,13 @@
 
 ## 手工联调
 
+真实 VPS 联调采用半自动证据采集加手工 UI 验收：
+
+- 用 `scripts/collect-vps-baseline.sh --target <ssh-alias-or-user@host> --interval 10 --duration 300` 采集远端只读基线。
+- 用 `docs/roles/manual-vps-report.md` 记录 dashboard、fingerprint、断网恢复、删除 host 后订阅停止等 UI 验收结果。
+- 采样脚本不会自动接受未知 SSH fingerprint；首次 fingerprint 验收仍以 VPScope UI 为准。
+- 清单勾选前，应在报告中附 baseline log 路径、截图或日志证据。
+
 - [ ] 新增主机弹窗第一屏展示 `~/.ssh/config` 可导入 Host 列表。
 - [ ] 选择 SSH config alias 后，测试连接使用 `ssh_agent`，保存后 `name = alias`、`address = alias`。
 - [ ] 保存 SSH config profile 后，选择该主机进入监控，确认复用系统 SSH alias 行为。
