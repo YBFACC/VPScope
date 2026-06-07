@@ -164,10 +164,18 @@ export type MetricsLastSnapshotResult = HostSnapshot | null;
 
 export type TrayItemDisplayMode = "text" | "rings";
 
+export type TrayMetricSettings = {
+  cpu: boolean;
+  memory: boolean;
+  disk: boolean;
+  network: boolean;
+};
+
 export type TraySettingsItem = {
   hostId: HostId;
   label: string;
   displayMode: TrayItemDisplayMode;
+  metrics: TrayMetricSettings;
 };
 
 export type TraySettings = {
@@ -510,13 +518,19 @@ type TraySettings = {
     hostId: HostId;
     label: string;
     displayMode: "text" | "rings";
+    metrics: {
+      cpu: boolean;
+      memory: boolean;
+      disk: boolean;
+      network: boolean;
+    };
   }>;
 };
 ```
 
 ### `tray_settings_update`
 
-用途：更新 macOS 菜单栏展示配置，并立即刷新后端菜单栏状态项。支持多个 VPS 同时展示；文本模式显示 `label cpu mem disk`，圆环模式显示 `label` 和进度环。
+用途：更新 macOS 菜单栏展示配置，并立即刷新后端菜单栏状态项。支持多个 VPS 同时展示；文本模式按 `metrics` 开关显示 `label`、CPU、内存、磁盘和网络上下行，圆环模式显示 `label` 和进度环。
 
 请求：
 

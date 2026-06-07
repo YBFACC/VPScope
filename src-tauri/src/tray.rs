@@ -1,5 +1,5 @@
 use crate::{
-    config::{TrayItemDisplayMode, TraySettings},
+    config::{TrayItemDisplayMode, TrayMetricSettings, TraySettings},
     errors::AppError,
     metrics::snapshot::HostSnapshot,
 };
@@ -31,6 +31,7 @@ struct TrayItem {
     status_item: MenuItem<Wry>,
     label: String,
     display_mode: TrayItemDisplayMode,
+    metrics: TrayMetricSettings,
 }
 
 impl TrayState {
@@ -96,7 +97,13 @@ impl TrayInner {
         self.remove_current_items(&app);
 
         if self.settings.items.is_empty() {
-            let item = create_tray_item(&app, "vpscope-status", "VS", TrayItemDisplayMode::Text)?;
+            let item = create_tray_item(
+                &app,
+                "vpscope-status",
+                "VS",
+                TrayItemDisplayMode::Text,
+                TrayMetricSettings::default(),
+            )?;
             item.apply_waiting_display();
             self.fallback = Some(item);
             return Ok(());
@@ -104,7 +111,13 @@ impl TrayInner {
 
         for configured in self.settings.items.clone() {
             let id = format!("vpscope-status-{}", sanitize_tray_id(&configured.host_id));
-            let item = create_tray_item(&app, &id, &configured.label, configured.display_mode)?;
+            let item = create_tray_item(
+                &app,
+                &id,
+                &configured.label,
+                configured.display_mode,
+                configured.metrics,
+            )?;
 
             if let Some(snapshot) = self.snapshots.get(&configured.host_id) {
                 item.apply_snapshot(snapshot);
@@ -146,29 +159,37 @@ impl TrayItem {
     fn apply_snapshot(&self, snapshot: &HostSnapshot) {
         let memory_percent = percent(snapshot.memory.used_bytes, snapshot.memory.total_bytes);
         let disk_percent = max_disk_percent(snapshot);
+        let (rx_bytes_per_sec, tx_bytes_per_sec) = network_rates(snapshot);
         let title = compact_status_title(
             &self.label,
             snapshot.cpu.total_percent,
             memory_percent,
             disk_percent,
+            rx_bytes_per_sec,
+            tx_bytes_per_sec,
             self.display_mode,
+            &self.metrics,
         );
         let tooltip = format!(
-            "{}\nCPU {}% · MEM {}% · DISK {}%\nLoad {:.2} {:.2} {:.2}",
+            "{}\nCPU {}% · MEM {}% · DISK {}%\nNET ↓ {} · ↑ {}\nLoad {:.2} {:.2} {:.2}",
             snapshot.system.hostname,
             round(snapshot.cpu.total_percent),
             round(memory_percent),
             round(disk_percent),
+            format_rate(rx_bytes_per_sec),
+            format_rate(tx_bytes_per_sec),
             snapshot.system.load_avg[0],
             snapshot.system.load_avg[1],
             snapshot.system.load_avg[2]
         );
         let menu_text = format!(
-            "{}  CPU {}%  MEM {}%  DISK {}%",
+            "{}  CPU {}%  MEM {}%  DISK {}%  ↓ {}  ↑ {}",
             self.label,
             round(snapshot.cpu.total_percent),
             round(memory_percent),
-            round(disk_percent)
+            round(disk_percent),
+            format_rate(rx_bytes_per_sec),
+            format_rate(tx_bytes_per_sec)
         );
 
         match self.display_mode {
@@ -230,6 +251,7 @@ fn create_tray_item(
     id: &str,
     label: &str,
     display_mode: TrayItemDisplayMode,
+    metrics: TrayMetricSettings,
 ) -> Result<TrayItem, AppError> {
     let status_item = MenuItem::with_id(
         app,
@@ -302,6 +324,7 @@ fn create_tray_item(
         status_item,
         label,
         display_mode,
+        metrics,
     })
 }
 
@@ -337,21 +360,85 @@ fn max_disk_percent(snapshot: &HostSnapshot) -> f64 {
         .fold(0.0, f64::max)
 }
 
+fn network_rates(snapshot: &HostSnapshot) -> (f64, f64) {
+    if snapshot.sample_state != crate::metrics::snapshot::SampleState::Live {
+        return (0.0, 0.0);
+    }
+
+    snapshot.network.iter().fold((0.0, 0.0), |(rx, tx), iface| {
+        (
+            rx + iface.rx_bytes_per_sec.max(0.0),
+            tx + iface.tx_bytes_per_sec.max(0.0),
+        )
+    })
+}
+
+fn format_rate(bytes_per_sec: f64) -> String {
+    format!("{}/s", format_compact_bytes(bytes_per_sec, false))
+}
+
+fn format_tray_rate(bytes_per_sec: f64) -> String {
+    format_compact_bytes(bytes_per_sec, true)
+}
+
+fn format_compact_bytes(bytes: f64, fixed_width: bool) -> String {
+    let units = ["B", "K", "M", "G", "T"];
+    let mut value = bytes.max(0.0);
+    let mut unit_index = 0;
+
+    while value >= 1024.0 && unit_index < units.len() - 1 {
+        value /= 1024.0;
+        unit_index += 1;
+    }
+
+    let amount = if value >= 100.0 {
+        format!("{value:>5.0}")
+    } else if value >= 10.0 {
+        format!("{value:>5.1}")
+    } else {
+        format!("{value:>5.2}")
+    };
+
+    if fixed_width {
+        format!("{amount}{}", units[unit_index])
+    } else {
+        format!("{}{}", amount.trim(), units[unit_index])
+    }
+}
+
 fn compact_status_title(
     label: &str,
     cpu_percent: f64,
     memory_percent: f64,
     disk_percent: f64,
+    rx_bytes_per_sec: f64,
+    tx_bytes_per_sec: f64,
     display_mode: TrayItemDisplayMode,
+    metrics: &TrayMetricSettings,
 ) -> String {
     match display_mode {
-        TrayItemDisplayMode::Text => format!(
-            "{} {} {} {}",
-            label,
-            round(cpu_percent),
-            round(memory_percent),
-            round(disk_percent)
-        ),
+        TrayItemDisplayMode::Text => {
+            let mut parts = vec![label.to_string()];
+
+            if metrics.cpu {
+                parts.push(format!("{:>3}", round(cpu_percent)));
+            }
+            if metrics.memory {
+                parts.push(format!("{:>3}", round(memory_percent)));
+            }
+            if metrics.disk {
+                parts.push(format!("{:>3}", round(disk_percent)));
+            }
+            if metrics.network {
+                parts.push(format!(
+                    "↓{} ↑{}",
+                    format_tray_rate(rx_bytes_per_sec),
+                    format_tray_rate(tx_bytes_per_sec)
+                ));
+            }
+
+            parts.join(" ")
+        }
         TrayItemDisplayMode::Rings => label.to_string(),
     }
 }
@@ -506,4 +593,78 @@ fn blend_pixel(rgba: &mut [u8], size: u32, x: u32, y: u32, color: [u8; 3], alpha
         rgba[offset + channel] = (out * 255.0).round() as u8;
     }
     rgba[offset + 3] = (out_alpha * 255.0).round() as u8;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tray_rate_keeps_fixed_width_across_digit_changes() {
+        let rates = [
+            format_tray_rate(9.9 * 1024.0),
+            format_tray_rate(10.0 * 1024.0),
+            format_tray_rate(99.9 * 1024.0),
+            format_tray_rate(100.0 * 1024.0),
+            format_tray_rate(16.8 * 1024.0 * 1024.0),
+        ];
+
+        for rate in rates {
+            assert_eq!(rate.chars().count(), 6);
+        }
+    }
+
+    #[test]
+    fn compact_status_text_includes_fixed_width_network_rates() {
+        let title = compact_status_title(
+            "VS",
+            6.0,
+            25.0,
+            22.0,
+            16.8 * 1024.0,
+            22.9 * 1024.0,
+            TrayItemDisplayMode::Text,
+            &TrayMetricSettings::default(),
+        );
+
+        assert_eq!(title, "VS   6  25  22 ↓ 16.8K ↑ 22.9K");
+    }
+
+    #[test]
+    fn compact_status_text_uses_enabled_metric_blocks_only() {
+        let metrics = TrayMetricSettings {
+            cpu: true,
+            memory: false,
+            disk: false,
+            network: true,
+        };
+        let title = compact_status_title(
+            "VS",
+            6.0,
+            25.0,
+            22.0,
+            16.8 * 1024.0,
+            22.9 * 1024.0,
+            TrayItemDisplayMode::Text,
+            &metrics,
+        );
+
+        assert_eq!(title, "VS   6 ↓ 16.8K ↑ 22.9K");
+    }
+
+    #[test]
+    fn rings_mode_keeps_short_label_title() {
+        let title = compact_status_title(
+            "VS",
+            6.0,
+            25.0,
+            22.0,
+            16.8 * 1024.0,
+            22.9 * 1024.0,
+            TrayItemDisplayMode::Rings,
+            &TrayMetricSettings::default(),
+        );
+
+        assert_eq!(title, "VS");
+    }
 }
