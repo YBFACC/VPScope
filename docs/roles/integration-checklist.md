@@ -50,7 +50,7 @@
 - [x] 测试连接。
 - [x] Rust 真实 known_hosts 三状态验收通过：unknown key、确认写入、normal known host、changed key 阻断。
 - [x] UI 首次连接展示 fingerprint，用户确认后可重新连接。
-- [ ] UI host key changed 显示强警告，且不会自动覆盖 known_hosts。
+- [x] UI host key changed 显示强警告，且不会自动覆盖 known_hosts。
 - [x] Dashboard 连续观察 5 分钟。
 - [x] 与 `top`、`free -m`、`df -h`、`cat /proc/loadavg` 对比。
 - [x] 断网或停 sshd 后 UI 进入可恢复错误状态。
@@ -59,7 +59,7 @@
 
 ## 当前剩余手工验收
 
-- 真实 changed-key 场景下 UI 强警告，且不会自动覆盖 known_hosts。
+- 无。
 
 ## 说明
 

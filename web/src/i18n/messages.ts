@@ -49,8 +49,11 @@ export const messages = {
     hostAlreadyExists: "相同地址、端口和用户的主机已存在",
     hostKeyAccepted: "主机指纹已写入系统 known_hosts",
     hostKeyChanged: "主机指纹已变化，请用系统 SSH 工具人工检查 known_hosts",
-    hostKeyUnknown: "首次连接需要确认主机指纹",
-    hostKeyUnknownMessage: "确认后 VPScope 会让系统 OpenSSH 写入默认 ~/.ssh/known_hosts；如果指纹和你预期不一致，请取消。",
+    hostKeyChangedMessage:
+      "VPScope 不会覆盖已变化的 host key。请先用系统 ssh 确认目标主机身份，并手动修正 ~/.ssh/known_hosts 后再连接。",
+    hostKeyUnknown: "系统尚未信任此 SSH 主机指纹",
+    hostKeyUnknownMessage:
+      "确认后 VPScope 会让系统 OpenSSH 写入默认 ~/.ssh/known_hosts；如果你刚刚修改过 known_hosts 或指纹和预期不一致，请取消并先用 ssh 检查。",
     hostName: "主机名",
     hostSaved: "主机已保存",
     hosts: "主机",
@@ -214,9 +217,11 @@ export const messages = {
     hostAlreadyExists: "A host with the same address, port, and user already exists",
     hostKeyAccepted: "host key was written to system known_hosts",
     hostKeyChanged: "host key changed; inspect known_hosts with system SSH tools",
-    hostKeyUnknown: "First connection needs host key confirmation",
+    hostKeyChangedMessage:
+      "VPScope will not overwrite a changed host key. Verify the remote host with system ssh, then fix ~/.ssh/known_hosts manually before reconnecting.",
+    hostKeyUnknown: "This SSH host key is not trusted yet",
     hostKeyUnknownMessage:
-      "After confirmation, VPScope asks system OpenSSH to write the default ~/.ssh/known_hosts entry. Cancel if the fingerprint is not expected.",
+      "After confirmation, VPScope asks system OpenSSH to write the default ~/.ssh/known_hosts entry. If you just edited known_hosts or the fingerprint is not expected, cancel and inspect it with ssh first.",
     hostName: "Host name",
     hostSaved: "host saved",
     hosts: "Hosts",

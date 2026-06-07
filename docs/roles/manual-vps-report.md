@@ -67,7 +67,7 @@ scripts/verify-known-hosts-flow.sh
 | 新增 host 后测试连接成功 | 通过 | 已通过真实 SSH config alias 流程验证 |
 | Rust 真实 known_hosts 三状态验收通过 | 通过 | `scripts/verify-known-hosts-flow.sh` passed on 2026-06-08；覆盖 unknown / accept-write / normal / changed blocking |
 | 首次连接展示 fingerprint，并由用户确认 | 通过 | UI 展示 fingerprint，确认后可重试连接 |
-| host key changed 时 UI 强警告且不自动连接 | 未测 |  |
+| host key changed 时 UI 强警告且不自动连接 | 通过 | 真实 changed-key 场景已验证；UI 显示强警告且不自动覆盖 `known_hosts` |
 | Dashboard 连续观察 5 分钟，snapshot 持续更新 | 通过 | 真实 VPS 已连续观察 |
 | CPU / load 与 `top`、`cat /proc/loadavg` 对比在合理范围 | 通过 | 详见 redacted 指标准确性报告 |
 | Memory 与 `free -m` 对比在合理范围 | 通过 | 详见 redacted 指标准确性报告 |
@@ -99,6 +99,6 @@ Suggested owner:
 
 ## 结论
 
-- Overall result: 有条件通过
+- Overall result: 通过
 - Release blocker: 无已知 blocker
-- Follow-up issues: changed-key UI 真实场景仍需补齐
+- Follow-up issues: 无

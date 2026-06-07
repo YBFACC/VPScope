@@ -77,8 +77,13 @@ export function DashboardPage() {
           (error) => error?.code === "SSH_HOST_KEY_UNKNOWN" && error.fingerprint,
         ) ?? undefined)
       : undefined;
+  const changedHostKeyError =
+    selectedHostId && selectedHost
+      ? ([metricsError, connection?.lastError].find((error) => error?.code === "SSH_HOST_KEY_CHANGED") ?? undefined)
+      : undefined;
   const hostKeyPromptId = hostKeyError?.fingerprint ? `${selectedHostId}:${hostKeyError.fingerprint}` : undefined;
   const showHostKeyPrompt = Boolean(hostKeyError?.fingerprint && hostKeyPromptId !== dismissedHostKey);
+  const showChangedHostKeyWarning = Boolean(changedHostKeyError);
   const retainedSnapshotError = selectedHost && snapshot ? metricsError ?? connection?.lastError : undefined;
 
   useEffect(() => {
@@ -282,7 +287,32 @@ export function DashboardPage() {
 
   return (
     <main className="cockpit-surface h-screen overflow-hidden bg-[var(--color-bg)] p-1 text-[var(--color-text)]">
-      {showHostKeyPrompt && selectedHost ? (
+      {showChangedHostKeyWarning && selectedHost ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-[var(--color-overlay)] p-4">
+          <div className="grid w-full max-w-lg gap-3 rounded-[var(--radius-panel)] border border-[var(--color-danger)] bg-[var(--color-panel-glass)] p-3 font-mono shadow-[var(--shadow-panel)]">
+            <div>
+              <h2 className="text-sm font-semibold uppercase text-[var(--color-danger)]">{t("hostKeyChanged")}</h2>
+              <p className="mt-1 text-[11px] uppercase leading-4 text-[var(--color-text-muted)]">
+                {t("hostKeyChangedMessage")}
+              </p>
+            </div>
+            <div className="grid gap-1 text-[11px] uppercase text-[var(--color-text-muted)]">
+              <span>
+                {t("host")}: <span className="text-[var(--color-text)]">{selectedHost.name}</span>
+              </span>
+              <span>
+                {t("address")}:{" "}
+                <span className="text-[var(--color-text)]">
+                  {selectedHost.address}:{selectedHost.port}
+                </span>
+              </span>
+              {changedHostKeyError?.message ? (
+                <span className="text-[var(--color-danger)]">{changedHostKeyError.message}</span>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : showHostKeyPrompt && selectedHost ? (
         <div className="fixed inset-0 z-50 grid place-items-center bg-[var(--color-overlay)] p-4">
           <div className="grid w-full max-w-lg gap-3 rounded-[var(--radius-panel)] border border-[var(--color-warning)] bg-[var(--color-panel-glass)] p-3 font-mono shadow-[var(--shadow-panel)]">
             <div>
