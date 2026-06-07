@@ -144,3 +144,22 @@ jobs:
             This release is created as a draft so artifacts can be checked before publishing.
           releaseDraft: true
           prerelease: true
+
+      - name: Remove version from macOS DMG asset names
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG_NAME}" \
+            --jq '.assets[] | select(.name | test("^VPScope_[0-9]+\\.[0-9]+\\.[0-9]+_[^/]+\\.dmg$")) | [.id, .name] | @tsv' |
+          while IFS=$'\t' read -r asset_id asset_name; do
+            new_name="$(printf '%s' "$asset_name" | sed -E 's/^VPScope_[0-9]+\.[0-9]+\.[0-9]+_(.+\.dmg)$/VPScope_\1/')"
+            if [ "$asset_name" != "$new_name" ]; then
+              gh api \
+                --method PATCH \
+                "repos/${GITHUB_REPOSITORY}/releases/assets/${asset_id}" \
+                -f name="$new_name"
+            fi
+          done
