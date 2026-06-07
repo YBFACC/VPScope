@@ -126,16 +126,8 @@ src-tauri/
 - 首选路径是只读导入 `~/.ssh/config` 中已有 `Host` alias。
 - 导入后保存 `name = alias`、`address = alias`，认证方式为 `ssh_agent`，优先复用系统 OpenSSH alias、`ssh-agent`、Keychain 和用户已有 SSH 配置。
 - VPScope 不自动写入或修改用户的 `~/.ssh/config`；后续如果支持写入，必须单独设计确认、备份和冲突处理策略。
-
-高级手动兜底配置：
-
-- host
-- port
-- username
-- auth type: private key / ssh-agent
-- key path
-- known_hosts 策略
-- refresh interval
+- 如果 alias 缺少 `User`，VPScope 提示用户回到 `~/.ssh/config` 补齐，不在 app 内提供手动补齐入口。
+- MVP 不提供高级手动配置、手填地址或 app 内 private key profile 创建；需要 private key 的场景继续通过系统 SSH config、ssh-agent 或 Keychain 处理。
 
 Rust 后端建立 SSH 连接后，周期性执行只读命令或读取 `/proc` 文件：
 
@@ -365,7 +357,7 @@ SSH 和系统命令是本项目的主要风险点。
 - Tauri capability 只开放必要命令。
 - Rust 层维护命令白名单。
 - 默认复用系统 SSH、ssh-agent、系统 Keychain 和 `~/.ssh/config`。
-- MVP 不实现 app-managed password 或 private key passphrase；host 配置文件只保存 password-less auth 所需的 username、address、port 和可选 key path。
+- MVP 不实现 app-managed password 或 private key passphrase；新增 host 主路径只保存由 SSH config alias 派生的 username、address alias、port。
 - password、private key 内容和 passphrase 不写日志，也不进入 VPScope 配置。
 - `~/.ssh/config` 只读导入，不读取私钥内容，不自动改写用户 SSH 配置。
 - known_hosts 默认严格校验，首次连接需要用户确认 fingerprint。

@@ -129,6 +129,11 @@ export function createMockTauriClient(): VPScopeClient {
           port: 22,
           identityFile: "~/.ssh/id_ed25519",
         },
+        {
+          alias: "needs-user",
+          hostName: "203.0.113.9",
+          port: 22,
+        },
       ];
     },
     async createHost(payload) {

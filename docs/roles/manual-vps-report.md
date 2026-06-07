@@ -32,20 +32,50 @@ scripts/collect-vps-baseline.sh --target <ssh-alias-or-user@host> --interval 10 
 - Dashboard screenshots:
 - App logs path, if any:
 
+## known_hosts / fingerprint 证据
+
+Rust 真实环境验收命令：
+
+```sh
+VPSCOPE_TEST_SSH_HOST=<host-or-ip> \
+VPSCOPE_TEST_SSH_USER=<username> \
+VPSCOPE_TEST_SSH_PORT=<port> \
+scripts/verify-known-hosts-flow.sh
+```
+
+可选：如果不使用 ssh-agent，可增加 `VPSCOPE_TEST_SSH_KEY_PATH=<absolute-key-path>`。该测试会让 OpenSSH 使用临时 known_hosts 文件，仍保留真实 `~/.ssh/config` / ssh-agent 行为，不会修改用户真实 known_hosts。
+
+通过标准：
+
+- 空 known_hosts 首次连接返回 `SSH_HOST_KEY_UNKNOWN`，并带 `SHA256:` fingerprint。
+- `host_accept_key` 等价路径会重新扫描 fingerprint，匹配后写入临时系统 OpenSSH known_hosts。
+- 已写入匹配 key 后，严格 known_hosts 连接成功。
+- 写入同 host/port 的错误 key 后，连接返回 `SSH_HOST_KEY_CHANGED`，且不自动覆盖。
+
+- known_hosts flow command:
+- known_hosts flow result:
+- Redacted known_hosts flow latest result:
+  `VPSCOPE_TEST_SSH_HOST=<redacted-ssh-config-alias> VPSCOPE_TEST_SSH_USER=ubuntu VPSCOPE_TEST_SSH_PORT=22 scripts/verify-known-hosts-flow.sh` passed on 2026-06-08. The gated Rust test covered unknown key, accept/write, normal known host, and changed key blocking with a temporary known_hosts file.
+- Fingerprint shown in UI:
+- Fingerprint accepted in UI:
+- Changed-key UI warning screenshot/log:
+
 ## 验收记录
 
 | Item | Result | Evidence / Notes |
 | --- | --- | --- |
-| 新增 host 后测试连接成功 | 未测 |  |
-| 首次连接展示 fingerprint，并由用户确认 | 未测 |  |
-| Dashboard 连续观察 5 分钟，snapshot 持续更新 | 未测 |  |
-| CPU / load 与 `top`、`cat /proc/loadavg` 对比在合理范围 | 未测 |  |
-| Memory 与 `free -m` 对比在合理范围 | 未测 |  |
-| Disk 与 `df -h` / `df -P` 对比挂载和容量一致 | 未测 |  |
-| Network 接口与 `/proc/net/dev` 对应，速率随流量变化 | 未测 |  |
-| 断网或停 sshd 后 UI 进入可恢复错误状态 | 未测 |  |
-| 恢复网络或 sshd 后 snapshot 继续更新 | 未测 |  |
-| 删除 host 后不再收到旧 host 订阅事件 | 未测 |  |
+| 新增 host 后测试连接成功 | 通过 | 已通过真实 SSH config alias 流程验证 |
+| Rust 真实 known_hosts 三状态验收通过 | 通过 | `scripts/verify-known-hosts-flow.sh` passed on 2026-06-08；覆盖 unknown / accept-write / normal / changed blocking |
+| 首次连接展示 fingerprint，并由用户确认 | 通过 | UI 展示 fingerprint，确认后可重试连接 |
+| host key changed 时 UI 强警告且不自动连接 | 未测 |  |
+| Dashboard 连续观察 5 分钟，snapshot 持续更新 | 通过 | 真实 VPS 已连续观察 |
+| CPU / load 与 `top`、`cat /proc/loadavg` 对比在合理范围 | 通过 | 详见 redacted 指标准确性报告 |
+| Memory 与 `free -m` 对比在合理范围 | 通过 | 详见 redacted 指标准确性报告 |
+| Disk 与 `df -h` / `df -P` 对比挂载和容量一致 | 通过 | 详见 redacted 指标准确性报告 |
+| Network 接口与 `/proc/net/dev` 对应，速率随流量变化 | 通过 | 详见 redacted 指标准确性报告 |
+| 断网或停 sshd 后 UI 进入可恢复错误状态 | 通过 | 断网可恢复；Dashboard 保留最后一帧并通过非阻塞错误状态提示重试 |
+| 恢复网络或 sshd 后 snapshot 继续更新 | 通过 | 恢复后 snapshot 继续更新 |
+| 删除 host 后不再收到旧 host 订阅事件 | 通过 | 删除 VPScope app 内 host/profile 后，`host_delete` 后端清理订阅、snapshot、SSH session；前端同步清 store；不涉及系统 `known_hosts` |
 
 ## 对比口径
 
@@ -69,6 +99,6 @@ Suggested owner:
 
 ## 结论
 
-- Overall result: 未通过 / 有条件通过 / 通过
-- Release blocker:
-- Follow-up issues:
+- Overall result: 有条件通过
+- Release blocker: 无已知 blocker
+- Follow-up issues: changed-key UI 真实场景仍需补齐

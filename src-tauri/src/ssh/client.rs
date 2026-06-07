@@ -8,6 +8,7 @@ use serde::Serialize;
 use std::{
     collections::HashMap,
     io::{ErrorKind, Write},
+    path::Path,
     process::{Command, Stdio},
     sync::{Arc, Mutex},
     time::Instant,
@@ -228,14 +229,24 @@ impl OpenSshClient {
     }
 
     async fn connect(host: &HostConfig, known_hosts: KnownHosts) -> Result<Session, AppError> {
+        Self::connect_with_known_hosts_file(host, known_hosts, None).await
+    }
+
+    async fn connect_with_known_hosts_file(
+        host: &HostConfig,
+        known_hosts: KnownHosts,
+        known_hosts_file: Option<&Path>,
+    ) -> Result<Session, AppError> {
         if host.address.trim().is_empty() {
             return Err(AppError::config_invalid("Host address is required"));
         }
 
-        match Self::builder_for(host, known_hosts)?
-            .connect_mux(host.address.trim())
-            .await
-        {
+        let mut builder = Self::builder_for(host, known_hosts)?;
+        if let Some(known_hosts_file) = known_hosts_file {
+            builder.user_known_hosts_file(known_hosts_file);
+        }
+
+        match builder.connect_mux(host.address.trim()).await {
             Ok(session) => Ok(session),
             Err(error) => {
                 let app_error = map_openssh_connect_error(error);
@@ -329,15 +340,34 @@ impl OpenSshClient {
         Ok(session)
     }
 
+    #[cfg(test)]
+    async fn session_for_with_known_hosts_file(
+        host: &HostConfig,
+        known_hosts_file: &Path,
+    ) -> Result<Session, AppError> {
+        Self::connect_with_known_hosts_file(host, KnownHosts::Strict, Some(known_hosts_file)).await
+    }
+
     async fn accept_new_host_key(
         &self,
         host: &HostConfig,
         expected_fingerprint: &str,
     ) -> Result<String, AppError> {
+        self.accept_new_host_key_with_known_hosts_file(host, expected_fingerprint, None)
+            .await
+    }
+
+    async fn accept_new_host_key_with_known_hosts_file(
+        &self,
+        host: &HostConfig,
+        expected_fingerprint: &str,
+        known_hosts_file: Option<&Path>,
+    ) -> Result<String, AppError> {
         let fingerprints = scan_host_key_fingerprints(host)?;
         validate_expected_fingerprint(&fingerprints, expected_fingerprint)?;
 
-        let session = Self::connect(host, KnownHosts::Add).await?;
+        let session =
+            Self::connect_with_known_hosts_file(host, KnownHosts::Add, known_hosts_file).await?;
         drop(session);
         self.drop_cached_session(&host.id)?;
         Ok(expected_fingerprint.to_string())
@@ -983,7 +1013,9 @@ pub type DynSshClient = Arc<dyn SshClient>;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io;
+    use std::{env, fs, io, path::Path};
+
+    static REAL_SSH_ENV_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
     fn parses_full_metrics_batch_sections() {
@@ -1156,21 +1188,8 @@ __VPSCOPE_SECTION:diskstats__
 
     #[tokio::test]
     async fn openssh_client_can_connect_to_configured_host_when_enabled() {
-        let Ok(address) = std::env::var("VPSCOPE_TEST_SSH_HOST") else {
+        let Some(host) = real_ssh_host_config("ssh-test") else {
             return;
-        };
-        let username =
-            std::env::var("VPSCOPE_TEST_SSH_USER").unwrap_or_else(|_| "ubuntu".to_string());
-        let host = HostConfig {
-            id: "ssh-test".to_string(),
-            name: address.clone(),
-            address,
-            port: 22,
-            auth: HostAuth::SshAgent { username },
-            refresh_interval_ms: 2_000,
-            tags: Vec::new(),
-            created_at: 0,
-            updated_at: 0,
         };
 
         let client = OpenSshClient::new();
@@ -1184,4 +1203,154 @@ __VPSCOPE_SECTION:diskstats__
             .unwrap();
         assert!(loadavg.split_whitespace().count() >= 3);
     }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn validates_real_known_hosts_flow_when_enabled() {
+        if env::var("VPSCOPE_TEST_KNOWN_HOSTS_FLOW").as_deref() != Ok("1") {
+            return;
+        }
+        let _lock = REAL_SSH_ENV_LOCK.lock().expect("real SSH env lock");
+        let Some(host) = real_ssh_host_config("known-hosts-flow") else {
+            return;
+        };
+        let ssh_dir = make_temp_dir("vpscope-known-hosts-flow");
+        fs::create_dir_all(&ssh_dir).expect("create temporary .ssh");
+        set_private_dir_permissions(&ssh_dir);
+        let known_hosts = ssh_dir.join("known_hosts");
+
+        let client = OpenSshClient::new();
+        let unknown = OpenSshClient::session_for_with_known_hosts_file(&host, &known_hosts)
+            .await
+            .expect_err("empty known_hosts must report an unknown host key");
+        assert_eq!(unknown.code, "SSH_HOST_KEY_UNKNOWN");
+        let fingerprint = unknown
+            .fingerprint
+            .as_deref()
+            .expect("unknown host key error must include a fingerprint");
+        assert!(fingerprint.starts_with("SHA256:"));
+
+        let accepted = client
+            .accept_new_host_key_with_known_hosts_file(&host, fingerprint, Some(&known_hosts))
+            .await
+            .expect("matching fingerprint must be accepted");
+        assert_eq!(accepted, fingerprint);
+        assert!(
+            known_hosts.exists(),
+            "accepting a host key must write OpenSSH known_hosts"
+        );
+
+        let known_connection =
+            OpenSshClient::session_for_with_known_hosts_file(&host, &known_hosts)
+                .await
+                .expect("matching known_hosts entry must connect");
+        drop(known_connection);
+
+        write_changed_known_host(&known_hosts);
+        let changed = OpenSshClient::session_for_with_known_hosts_file(&host, &known_hosts)
+            .await
+            .expect_err("mismatched known_hosts entry must block connection");
+        assert_eq!(changed.code, "SSH_HOST_KEY_CHANGED");
+    }
+
+    fn real_ssh_host_config(id: &str) -> Option<HostConfig> {
+        let Ok(address) = env::var("VPSCOPE_TEST_SSH_HOST") else {
+            return None;
+        };
+        let username = env::var("VPSCOPE_TEST_SSH_USER").unwrap_or_else(|_| "ubuntu".to_string());
+        let port = env::var("VPSCOPE_TEST_SSH_PORT")
+            .ok()
+            .and_then(|value| value.parse::<u16>().ok())
+            .unwrap_or(22);
+        let auth = match env::var("VPSCOPE_TEST_SSH_KEY_PATH") {
+            Ok(key_path) if !key_path.trim().is_empty() => HostAuth::PrivateKey {
+                username,
+                key_path: Some(key_path),
+            },
+            _ => HostAuth::SshAgent { username },
+        };
+
+        Some(HostConfig {
+            id: id.to_string(),
+            name: address.clone(),
+            address,
+            port,
+            auth,
+            refresh_interval_ms: 2_000,
+            tags: Vec::new(),
+            created_at: 0,
+            updated_at: 0,
+        })
+    }
+
+    fn make_temp_dir(prefix: &str) -> std::path::PathBuf {
+        let path = env::temp_dir().join(format!("{prefix}-{}", uuid::Uuid::new_v4()));
+        fs::create_dir_all(&path).expect("create temporary directory");
+        set_private_dir_permissions(&path);
+        path
+    }
+
+    fn write_changed_known_host(known_hosts: &Path) {
+        let fake_key = known_hosts
+            .parent()
+            .expect("known_hosts parent")
+            .join("wrong_host_key");
+        let output = Command::new("/usr/bin/ssh-keygen")
+            .arg("-q")
+            .arg("-t")
+            .arg("ed25519")
+            .arg("-N")
+            .arg("")
+            .arg("-f")
+            .arg(&fake_key)
+            .output()
+            .expect("run ssh-keygen for changed host key fixture");
+        assert!(
+            output.status.success(),
+            "ssh-keygen must generate changed host key fixture: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+
+        let public_key =
+            fs::read_to_string(fake_key.with_extension("pub")).expect("read public key");
+        let mut parts = public_key.split_whitespace();
+        let key_type = parts.next().expect("public key type");
+        let key_data = parts.next().expect("public key data");
+        let existing_entry = fs::read_to_string(known_hosts).expect("read existing known_hosts");
+        let host_pattern = existing_entry
+            .lines()
+            .find_map(|line| {
+                let trimmed = line.trim();
+                if trimmed.is_empty() || trimmed.starts_with('#') {
+                    return None;
+                }
+                trimmed.split_whitespace().next().map(str::to_string)
+            })
+            .expect("existing known_hosts host pattern");
+        fs::write(
+            known_hosts,
+            format!("{host_pattern} {key_type} {key_data}\n"),
+        )
+        .expect("write changed known_hosts entry");
+        set_private_file_permissions(known_hosts);
+    }
+
+    #[cfg(unix)]
+    fn set_private_dir_permissions(path: &Path) {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(path, fs::Permissions::from_mode(0o700))
+            .expect("set private directory permissions");
+    }
+
+    #[cfg(not(unix))]
+    fn set_private_dir_permissions(_path: &Path) {}
+
+    #[cfg(unix)]
+    fn set_private_file_permissions(path: &Path) {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(path, fs::Permissions::from_mode(0o600))
+            .expect("set private file permissions");
+    }
+
+    #[cfg(not(unix))]
+    fn set_private_file_permissions(_path: &Path) {}
 }

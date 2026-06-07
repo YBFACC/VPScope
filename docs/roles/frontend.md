@@ -348,19 +348,9 @@ Host 管理界面包含：
 - 默认展示从 `~/.ssh/config` 只读导入的 `Host` 列表。
 - 选择 alias 后保存长期可复用 SSH profile。
 - 导入保存时 `name = alias`，`address = alias`，认证方式为 `ssh_agent`，以复用系统 OpenSSH alias、`ssh-agent` 和 Keychain 行为。
-- 如果导入条目缺少 `User`，允许用户在保存前补齐用户名。
+- 如果导入条目缺少 `User`，提示用户回到 `~/.ssh/config` 补齐；VPScope 内不提供手动补齐入口。
 - VPScope 不自动写入或修改用户的 `~/.ssh/config`。
-
-高级手动兜底字段：
-
-- 名称
-- 地址
-- 端口，默认 22
-- 用户名
-- 认证方式：ssh-agent/private key
-- key path 只在用户选择 private key auth 时显示
-- refresh interval
-- tags
+- MVP 不提供高级手动配置、手填地址、private key profile 创建或 password/passphrase 输入。
 
 交互要求：
 
@@ -368,13 +358,12 @@ Host 管理界面包含：
 - 测试连接时显示 loading。
 - host key unknown 时打开确认弹窗，展示 fingerprint。
 - 保存成功后自动选中新 host。
-- private key 文案必须说明密钥需要已可被系统 OpenSSH、ssh-agent 或系统 Keychain 无交互使用。
 
 验收：
 
 - 使用 mock client 时可以完整走 SSH config 导入、测试、保存、选中的流程。
-- 无 SSH config 条目时可以进入高级手动配置。
-- 高级手动配置可创建 ssh-agent/private key profile，且不展示 password 或 passphrase secret 输入项。
+- 无 SSH config 条目时提示先配置系统 `~/.ssh/config`。
+- 缺少 `User` 的 SSH config 条目不能测试或保存，并提示回到系统 SSH config 补齐。
 
 ### Step 9: 接入实时指标
 
