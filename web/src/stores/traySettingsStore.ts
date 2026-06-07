@@ -1,6 +1,13 @@
 import { create } from "zustand";
 import { runClient, tauriClient } from "@/lib/tauriClient";
-import type { AppError, HostConfig, HostId, TrayItemDisplayMode, TraySettings } from "@/types/contracts";
+import type {
+  AppError,
+  HostConfig,
+  HostId,
+  TrayItemDisplayMode,
+  TrayMetricSettings,
+  TraySettings,
+} from "@/types/contracts";
 
 type TraySettingsStore = {
   settings: TraySettings;
@@ -14,6 +21,13 @@ type TraySettingsStore = {
 
 const emptySettings: TraySettings = {
   items: [],
+};
+
+export const defaultTrayMetrics: TrayMetricSettings = {
+  cpu: true,
+  memory: true,
+  disk: true,
+  network: true,
 };
 
 export const useTraySettingsStore = create<TraySettingsStore>((set) => ({
@@ -79,6 +93,7 @@ export function nextTraySettingsForHost(
           hostId: host.id,
           label: defaultTrayLabel(host),
           displayMode,
+          metrics: defaultTrayMetrics,
         },
       ],
     };
@@ -96,7 +111,7 @@ export function nextTraySettingsForHost(
 export function updateTrayItem(
   settings: TraySettings,
   hostId: HostId,
-  patch: Partial<{ label: string; displayMode: TrayItemDisplayMode }>,
+  patch: Partial<{ label: string; displayMode: TrayItemDisplayMode; metrics: TrayMetricSettings }>,
 ) {
   return {
     items: settings.items.map((item) => (item.hostId === hostId ? { ...item, ...patch } : item)),

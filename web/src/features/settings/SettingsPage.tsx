@@ -9,6 +9,7 @@ import {
 } from "@/stores/alertSettingsStore";
 import { useHostStore } from "@/stores/hostStore";
 import {
+  defaultTrayMetrics,
   defaultTrayLabel,
   nextTraySettingsForHost,
   updateTrayItem,
@@ -23,6 +24,7 @@ import type {
   TerminalApp,
   TerminalSettings,
   TrayItemDisplayMode,
+  TrayMetricSettings,
   TraySettings,
 } from "@/types/contracts";
 
@@ -126,11 +128,34 @@ export function SettingsPage() {
     setTrayDraft(updateTrayItem(ensured, host.id, { displayMode }));
   };
 
+  const setTrayMetric = (host: HostConfig, metric: keyof TrayMetricSettings, enabled: boolean) => {
+    const ensured = nextTraySettingsForHost(trayDraft, host, true);
+    const item = ensured.items.find((candidate) => candidate.hostId === host.id);
+    const metrics = { ...defaultTrayMetrics, ...(item?.metrics ?? {}) };
+
+    if (!enabled && Object.entries(metrics).filter(([key, value]) => key !== metric && value).length === 0) {
+      return;
+    }
+
+    setTrayDraft(
+      updateTrayItem(ensured, host.id, {
+        metrics: {
+          ...metrics,
+          [metric]: enabled,
+        },
+      }),
+    );
+  };
+
   const onSaveTraySettings = async () => {
     await saveTraySettings({
       items: trayDraft.items.map((item) => ({
         ...item,
         label: item.label.trim() || "vps",
+        metrics: {
+          ...defaultTrayMetrics,
+          ...(item.metrics ?? {}),
+        },
       })),
     });
   };
@@ -290,11 +315,12 @@ export function SettingsPage() {
                       const enabled = Boolean(item);
                       const displayMode = item?.displayMode ?? "text";
                       const label = item?.label ?? defaultTrayLabel(host);
+                      const metrics = { ...defaultTrayMetrics, ...(item?.metrics ?? {}) };
 
                       return (
                         <section
                           key={host.id}
-                          className="pixel-card grid gap-2 p-3 sm:grid-cols-[minmax(0,1fr)_112px_144px] sm:items-center"
+                          className="pixel-card grid gap-2 p-3"
                         >
                           <label className="flex min-w-0 items-start gap-2">
                             <input
@@ -311,28 +337,51 @@ export function SettingsPage() {
                             </span>
                           </label>
 
-                          <input
-                            value={label}
-                            disabled={!enabled}
-                            maxLength={12}
-                            onChange={(event) => setTrayLabel(host, event.currentTarget.value)}
-                            className="h-8 min-w-0 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-panel)] px-2 text-[var(--color-text)] outline-none focus:border-[var(--color-border-strong)] disabled:text-[var(--color-text-muted)]"
-                            aria-label={t("menuBarName")}
-                          />
+                          <div className="grid min-w-0 gap-2 pl-7 sm:grid-cols-[minmax(112px,0.7fr)_144px_minmax(220px,auto)] sm:items-center">
+                            <input
+                              value={label}
+                              disabled={!enabled}
+                              maxLength={12}
+                              onChange={(event) => setTrayLabel(host, event.currentTarget.value)}
+                              className="h-8 min-w-0 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-panel)] px-2 text-[var(--color-text)] outline-none focus:border-[var(--color-border-strong)] disabled:text-[var(--color-text-muted)]"
+                              aria-label={t("menuBarName")}
+                            />
 
-                          <div className="flex items-center gap-1 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-panel)] p-1">
-                            {(["text", "rings"] as const).map((mode) => (
-                              <button
-                                key={mode}
-                                type="button"
-                                disabled={!enabled}
-                                onClick={() => setTrayDisplayMode(host, mode)}
-                                className="h-6 flex-1 rounded-[var(--radius-control)] border border-transparent px-2 text-[10px] uppercase text-[var(--color-text-muted)] disabled:opacity-40 data-[active=true]:border-[var(--color-border-strong)] data-[active=true]:bg-[var(--color-panel-muted)] data-[active=true]:text-[var(--color-accent)]"
-                                data-active={displayMode === mode}
-                              >
-                                {mode === "text" ? t("textMode") : t("ringsMode")}
-                              </button>
-                            ))}
+                            <div className="flex items-center gap-1 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-panel)] p-1">
+                              {(["text", "rings"] as const).map((mode) => (
+                                <button
+                                  key={mode}
+                                  type="button"
+                                  disabled={!enabled}
+                                  onClick={() => setTrayDisplayMode(host, mode)}
+                                  className="h-6 flex-1 rounded-[var(--radius-control)] border border-transparent px-2 text-[10px] uppercase text-[var(--color-text-muted)] disabled:opacity-40 data-[active=true]:border-[var(--color-border-strong)] data-[active=true]:bg-[var(--color-panel-muted)] data-[active=true]:text-[var(--color-accent)]"
+                                  data-active={displayMode === mode}
+                                >
+                                  {mode === "text" ? t("textMode") : t("ringsMode")}
+                                </button>
+                              ))}
+                            </div>
+
+                            <div className="flex min-w-0 flex-wrap items-center gap-1 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-panel)] p-1">
+                              {(["cpu", "memory", "disk", "network"] as const).map((metric) => (
+                                <button
+                                  key={metric}
+                                  type="button"
+                                  disabled={!enabled}
+                                  onClick={() => setTrayMetric(host, metric, !metrics[metric])}
+                                  className="h-6 rounded-[var(--radius-control)] border border-transparent px-2 text-[10px] uppercase text-[var(--color-text-muted)] disabled:opacity-40 data-[active=true]:border-[var(--color-border-strong)] data-[active=true]:bg-[var(--color-panel-muted)] data-[active=true]:text-[var(--color-accent)]"
+                                  data-active={metrics[metric]}
+                                >
+                                  {metric === "cpu"
+                                    ? t("cpu")
+                                    : metric === "memory"
+                                      ? t("mem")
+                                      : metric === "disk"
+                                        ? t("disks")
+                                        : t("network")}
+                                </button>
+                              ))}
+                            </div>
                           </div>
                         </section>
                       );

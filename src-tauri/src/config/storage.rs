@@ -518,6 +518,12 @@ fn validate_tray_item<'a>(
         ));
     }
 
+    if !item.metrics.cpu && !item.metrics.memory && !item.metrics.disk && !item.metrics.network {
+        return Err(AppError::config_invalid(
+            "Menu bar item must display at least one metric",
+        ));
+    }
+
     Ok(())
 }
 

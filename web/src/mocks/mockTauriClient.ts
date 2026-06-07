@@ -18,6 +18,12 @@ let traySettings: TraySettings = {
       hostId: mockHosts[0]?.id ?? "mock-vps-1",
       label: "fl",
       displayMode: "text",
+      metrics: {
+        cpu: true,
+        memory: true,
+        disk: true,
+        network: true,
+      },
     },
   ],
 };
@@ -288,7 +294,7 @@ export function createMockTauriClient(): VPScopeClient {
     async getTraySettings() {
       await wait(80);
       return {
-        items: traySettings.items.map((item) => ({ ...item })),
+        items: traySettings.items.map((item) => ({ ...item, metrics: { ...item.metrics } })),
       };
     },
     async updateTraySettings(settings) {
@@ -297,10 +303,11 @@ export function createMockTauriClient(): VPScopeClient {
         items: settings.items.map((item) => ({
           ...item,
           label: item.label.trim().slice(0, 12),
+          metrics: { ...item.metrics },
         })),
       };
       return {
-        items: traySettings.items.map((item) => ({ ...item })),
+        items: traySettings.items.map((item) => ({ ...item, metrics: { ...item.metrics } })),
       };
     },
     async getAlertSettings() {

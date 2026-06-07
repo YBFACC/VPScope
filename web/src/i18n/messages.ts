@@ -74,7 +74,7 @@ export const messages = {
     menuBar: "菜单栏",
     menuBarName: "菜单栏名称",
     menuBarSettingsHint:
-      "选择要显示在 macOS 菜单栏里的 VPS，并设置短名称与展示方式。文本模式显示 名称 CPU 内存 磁盘；圆环模式显示名称和进度环。",
+      "选择要显示在 macOS 菜单栏里的 VPS，并设置短名称、展示方式和指标块。文本模式按开关显示名称、CPU、内存、磁盘和网络上下行；圆环模式显示名称和进度环。",
     moveHostDown: "下移主机",
     moveHostUp: "上移主机",
     movePanelDown: "下移模块",
@@ -242,7 +242,7 @@ export const messages = {
     menuBar: "Menu Bar",
     menuBarName: "Menu bar name",
     menuBarSettingsHint:
-      "Choose which VPS entries appear in the macOS menu bar, then set a short label and display mode. Text shows name CPU memory disk; rings shows name plus progress rings.",
+      "Choose which VPS entries appear in the macOS menu bar, then set a short label, display mode, and metric blocks. Text shows enabled name, CPU, memory, disk, and network rates; rings shows name plus progress rings.",
     moveHostDown: "Move host down",
     moveHostUp: "Move host up",
     movePanelDown: "Move panel down",

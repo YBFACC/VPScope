@@ -159,10 +159,18 @@ export type MetricsUnsubscribeResult = {
 
 export type TrayItemDisplayMode = "text" | "rings";
 
+export type TrayMetricSettings = {
+  cpu: boolean;
+  memory: boolean;
+  disk: boolean;
+  network: boolean;
+};
+
 export type TraySettingsItem = {
   hostId: HostId;
   label: string;
   displayMode: TrayItemDisplayMode;
+  metrics: TrayMetricSettings;
 };
 
 export type TraySettings = {
