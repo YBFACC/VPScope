@@ -1,214 +1,214 @@
 # AGENTS.md
 
-VPScope is a macOS desktop app for monitoring local and remote VPS resource usage. It should feel close to btop in density, speed, keyboard affordances, and operational focus, but it is a desktop app rather than a terminal clone.
+VPScope 是一个用于监控本地和远程 VPS 资源使用情况的 macOS 桌面应用程序。在密度、速度、键盘交互和操作重点方面，它应该感觉接近 btop，但它是一个桌面应用，而不是终端克隆版。
 
-This file is the working contract for coding agents in this repository. Read it before making changes.
+本文件是此代码库中编码智能体 (coding agents) 的工作契约。在进行更改前，请先阅读本文档。
 
-## Global Agent Rules
+## 全局智能体规则
 
-### Language
+### 语言
 
-Default to Chinese in user-facing replies unless the user explicitly requests another language.
+除非用户明确要求使用其他语言，否则在面向用户的回复中默认使用中文。
 
-### Collaboration Style
+### 协作风格
 
-- Treat the user as a capable collaborator. Be warm, candid, practical, and concise.
-- Lead with the answer or outcome, then include only the context needed to trust it.
-- Understand intent with minimal prompting. If a low-risk assumption is available, state it briefly and proceed.
-- Ask for clarification only when missing information would materially change the work or create meaningful risk.
-- Do not add unrelated features, speculative follow-ups, broad rewrites, or post-answer enhancement suggestions.
+- 将用户视为有能力的合作者。保持热情、坦诚、务实且简明扼要。
+- 首先给出答案或结果，然后仅包含建立信任所需的上下文。
+- 尽量在最少提示下理解用户的意图。如果可以进行低风险的假设，请简要说明并继续。
+- 只有当缺失的信息会实质性地改变工作或产生重大风险时，才要求用户澄清。
+- 不要添加无关的功能、推测性的后续操作、大规模重写或在解答后提出改进建议。
 
-### Preamble
+### 开场白
 
-Before tool calls for a multi-step coding task, send a short user-visible update that acknowledges the request and states the first step. Keep it to one or two sentences.
+在为一个多步骤的编码任务调用工具之前，发送一个简短的、用户可见的更新，确认请求并说明第一步。将其控制在一两句话以内。
 
-### Planning
+### 计划
 
-- For non-trivial coding tasks, produce a short plan covering root cause, affected files, hotfix vs structural scope, approach, and validation.
-- For large tasks, compare a minimal patch with a root-cause fix. Choose the maintainable option when the minimal patch increases inconsistency or debt.
-- Proceed directly for trivial edits.
-- After each significant step, ask whether the user's core request can now be answered with sufficient evidence. If yes, answer and stop.
+- 对于非平凡的编码任务，制定一个简短的计划，涵盖根本原因、受影响的文件、热修复与结构性范围、方法和验证。
+- 对于大型任务，比较最小化补丁与根本原因修复。当最小化补丁增加不一致性或技术债务时，选择更易维护的选项。
+- 对于琐碎的修改，直接进行。
+- 在每个重要步骤之后，询问用户核心请求现在是否可以通过充分的证据得到解答。如果是，回答并停止。
 
-### Debug-First Policy
+### 调试优先原则
 
-Let failures surface clearly through explicit errors, exceptions, logs, or failing tests. Do not introduce silent fallbacks, mock success paths, broad catch-all guards, or defensive behavior just to make things appear to run. If a security, safety, or privacy boundary is necessary, make it explicit, documented, easy to disable when appropriate, and agreed by the user beforehand.
+让失败通过显式错误、异常、日志或失败的测试清晰地显现出来。不要为了让代码看起来能运行而引入静默的后备方案 (silent fallbacks)、模拟的成功路径、宽泛的万能保护机制或防御性行为。如果安全、保障或隐私边界是必要的，请使其明确、被记录、易于在适当时禁用，并事先得到用户的同意。
 
-### Bug-Fix Philosophy
+### 错误修复理念
 
-- Trace the root cause from first principles. Do not only patch the visible symptom.
-- Prefer subtraction: remove redundant config, dead branches, unnecessary gates, and obsolete logic before adding new layers.
-- Avoid duplicate implementations, second sources of truth, parallel validation or permission logic, hidden fallback behavior, broad try/catch blocks that swallow errors, and silent defaults that mask bad data.
-- If any of those patterns is necessary, explain why and keep it bounded.
+- 从第一性原理追踪根本原因。不要只修补表面症状。
+- 倾向于做减法：在添加新层之前，移除冗余配置、死分支、不必要的门控和过时的逻辑。
+- 避免重复的实现、第二个事实来源、平行的验证或权限逻辑、隐藏的后备行为、吞没错误的宽泛 try/catch 块以及掩盖不良数据的静默默认值。
+- 如果必须使用这些模式中的任何一个，请解释原因并限制其范围。
 
-### Structural Fix Trigger
+### 结构性修复触发条件
 
-Treat a task as structural, not a local hotfix, when it touches duplicated business logic, multiple sources of truth, shared validation, permissions, routing, caching, API contracts, schemas, migrations, cross-module behavior, flaky tests, hidden fallbacks, repeated bug patterns, state synchronization, or security and data-integrity boundaries. For structural fixes, identify the invariant that should hold, express it in one place, and remove obsolete logic instead of layering around it.
+如果一项任务涉及重复的业务逻辑、多个事实来源、共享验证、权限、路由、缓存、API 契约、模式、迁移、跨模块行为、不稳定的测试、隐藏的后备方案、重复的错误模式、状态同步或安全与数据完整性边界，请将其视为结构性任务，而不是局部的热修复。对于结构性修复，确定应该保持的约束（不变量），在一个地方表达它，并移除过时的逻辑，而不是在其周围堆砌。
 
-### Resource Use
+### 资源使用
 
-Use available tools, MCPs, skills, browser checks, tests, and parallel agents when they materially improve evidence quality, runtime verification, or codebase understanding. Stop once the core request is answered with sufficient evidence.
+利用可用的工具、MCP、技能、浏览器检查、测试和并行智能体，只要它们能实质性地改善证据质量、运行时验证或对代码库的理解。一旦用户的核心请求得到了充分的证据解答，就停下来。
 
-### Skills
+### 技能 (Skills)
 
-Skills live in `~/.codex/skills/` and `.codex/skills/`. Before starting a task, scan available skills. If one matches, read its `SKILL.md`, follow it, and announce which skill is being used.
+技能存放在 `~/.codex/skills/` 和 `.codex/skills/` 目录中。在开始任务之前，扫描可用的技能。如果找到匹配的技能，请阅读其 `SKILL.md`，遵循它，并宣布正在使用哪个技能。
 
-## Product Positioning
+## 产品定位
 
-VPScope monitors server health and resource usage through a native desktop experience.
+VPScope 通过原生桌面体验监控服务器健康和资源使用情况。
 
-Primary product goals:
+主要产品目标：
 
-- Build a macOS-first desktop app using Tauri v2.
-- Use React, TypeScript, Vite, and Tailwind CSS for the frontend.
-- Use Rust in Tauri for SSH, server interaction, local configuration, credentials, parsing, and event streaming.
-- Support agentless VPS monitoring over SSH as the MVP path.
-- Display CPU, memory, disks, network, load, uptime, and process information.
-- Keep the UI dense, fast, stable, and suitable for long-running monitoring.
-- Keep visual styling theme-driven. Do not hard-code core visual decisions in components.
+- 构建一个基于 Tauri v2 的 macOS 优先的桌面应用。
+- 前端使用 React、TypeScript、Vite 和 Tailwind CSS。
+- 在 Tauri 的后端使用 Rust，用于处理 SSH、服务器交互、本地配置、凭证、解析和事件流。
+- 作为 MVP 路径，支持基于 SSH 的无 Agent VPS 监控。
+- 显示 CPU、内存、磁盘、网络、负载、正常运行时间 (uptime) 和进程信息。
+- 保持 UI 密集、快速、稳定，适合长时间运行的监控。
+- 保持视觉样式由主题驱动。不要在组件中硬编码核心的视觉决定。
 
-Non-goals for the MVP:
+MVP 的非目标：
 
-- Do not build a marketing landing page.
-- Do not require installing a server agent on the VPS.
-- Do not implement destructive remote actions such as kill, restart, delete, or service control.
-- Do not add Docker, Kubernetes, GPU, alerting, historical database, or multi-host aggregate dashboards unless a later task explicitly asks for them.
+- 不要构建营销落地页。
+- 不要求在 VPS 上安装服务器 agent。
+- 不实现破坏性的远程操作，如 kill、重启、删除或服务控制。
+- 不添加 Docker、Kubernetes、GPU、告警、历史数据库或多主机聚合仪表板，除非后续任务明确要求。
 
-## Source Of Truth
+## 事实来源 (Source Of Truth)
 
-Use these documents as the current design source:
+将以下文档作为当前的设计来源：
 
-- `docs/vpscope-plan.md`: overall product and architecture plan.
-- `docs/roles/README.md`: role split and collaboration flow.
-- `docs/roles/contracts.md`: frontend/backend command, event, and data contract.
-- `docs/roles/frontend.md`: frontend implementation steps and constraints.
-- `docs/roles/backend-rust.md`: Rust backend implementation steps and constraints.
-- `docs/roles/integration-test.md`: integration and verification plan.
+- `docs/vpscope-plan.md`：整体产品和架构计划。
+- `docs/roles/README.md`：角色划分和协作流程。
+- `docs/roles/contracts.md`：前端/后端命令、事件和数据契约。
+- `docs/roles/frontend.md`：前端实现步骤和约束。
+- `docs/roles/backend-rust.md`：Rust 后端实现步骤和约束。
+- `docs/roles/integration-test.md`：集成和验证计划。
 
-If implementation requirements conflict with these documents, update the relevant document in the same change and explain why.
+如果实现要求与这些文档有冲突，请在同一更改中更新相关文档并解释原因。
 
-## Repository Layout
+## 仓库布局
 
-Expected project layout:
+预期的项目布局：
 
 ```text
 VPScope/
   AGENTS.md
   docs/
-  web/                  React + TypeScript + Tailwind frontend
-  src-tauri/            Tauri v2 Rust backend
+  web/                  React + TypeScript + Tailwind 前端
+  src-tauri/            Tauri v2 Rust 后端
 ```
 
-The repository may initially contain only documentation. When creating code, follow this layout unless the user explicitly changes it.
+初始仓库可能仅包含文档。在创建代码时，请遵循此布局，除非用户明确要求更改。
 
-## Role Boundaries
+## 角色边界
 
-### Frontend Agent
+### 前端智能体 (Frontend Agent)
 
-Work inside `/web`.
+在 `/web` 目录内工作。
 
-Responsibilities:
+职责：
 
-- Build React UI, routes, components, stores, mocks, formatting utilities, and theme system.
-- Implement the dashboard, host management UI, settings UI, process table, charts, meters, keyboard interaction, and error states.
-- Maintain TypeScript contract types in `/web/src/types/contracts.ts`.
-- Wrap Tauri calls in a client abstraction such as `/web/src/lib/tauriClient.ts`.
-- Provide a mock client so the frontend can run before the Rust backend is complete.
+- 构建 React UI、路由、组件、状态库、Mock 数据、格式化工具和主题系统。
+- 实现仪表板、主机管理 UI、设置 UI、进程表格、图表、仪表、键盘交互和错误状态。
+- 在 `/web/src/types/contracts.ts` 中维护 TypeScript 契约类型。
+- 在类似 `/web/src/lib/tauriClient.ts` 的客户端抽象中封装 Tauri 调用。
+- 提供 Mock 客户端，以便在 Rust 后端完成之前能够运行前端。
 
-Do not:
+不要做：
 
-- Execute SSH.
-- Run shell commands on remote servers.
-- Read remote files directly.
-- Store credentials.
-- Modify backend internals unless the task explicitly spans both frontend and backend.
+- 执行 SSH。
+- 在远程服务器上运行 shell 命令。
+- 直接读取远程文件。
+- 存储凭据。
+- 修改后端内部逻辑，除非任务明确跨越前端和后端。
 
-### Backend Rust Agent
+### 后端 Rust 智能体 (Backend Rust Agent)
 
-Work inside `/src-tauri`.
+在 `/src-tauri` 目录内工作。
 
-Responsibilities:
+职责：
 
-- Build Tauri v2 app configuration and Rust command handlers.
-- Implement host config CRUD, SSH connection testing, session reuse, metrics collection, parser logic, event streaming, credential storage, and known_hosts validation.
-- Keep all remote server commands fixed and whitelisted.
-- Serialize Rust structs to match `docs/roles/contracts.md`.
-- Provide unit tests for parsers and data conversion logic.
+- 构建 Tauri v2 应用配置和 Rust 命令处理器。
+- 实现主机配置 CRUD、SSH 连接测试、会话复用、指标收集、解析器逻辑、事件流、凭据存储和 known_hosts 验证。
+- 保持所有远程服务器命令固定并列入白名单。
+- 序列化 Rust 结构体以匹配 `docs/roles/contracts.md`。
+- 为解析器和数据转换逻辑提供单元测试。
 
-Do not:
+不要做：
 
-- Change visual layout or component styling in `/web/src/components` or `/web/src/features` unless explicitly asked.
-- Expose shell execution to the frontend.
-- Store passwords, private keys, or passphrases in ordinary config files.
+- 更改 `/web/src/components` 或 `/web/src/features` 中的视觉布局或组件样式，除非明确要求。
+- 向前端暴露 shell 执行权限。
+- 在普通配置文件中存储密码、私钥或密码短语 (passphrases)。
 
-### Integration/Test Agent
+### 集成/测试智能体 (Integration/Test Agent)
 
-Work across docs, mocks, contract types, parser fixtures, and test harnesses.
+跨文档、Mock 数据、契约类型、解析器测试用例 (fixtures) 和测试框架工作。
 
-Responsibilities:
+职责：
 
-- Verify that TypeScript types, Rust serde output, commands, events, and mock data match the contract.
-- Create mock snapshots for idle, busy, and error states.
-- Add parser fixtures for Linux command outputs.
-- Validate app behavior against a real SSH VPS when credentials are provided by the user.
+- 验证 TypeScript 类型、Rust serde 输出、命令、事件和 Mock 数据是否符合契约。
+- 为空闲、繁忙和错误状态创建 Mock 快照。
+- 为 Linux 命令输出添加解析器 fixtures。
+- 当用户提供凭据时，在真实的 SSH VPS 上验证应用程序的行为。
 
-Do not:
+不要做：
 
-- Rewrite large frontend or backend subsystems when a smaller contract or fixture fix is enough.
+- 当通过较小的契约或 fixture 修复就足够时，重写大型前端或后端子系统。
 
-## Frontend Constraints
+## 前端约束
 
-Use:
+使用：
 
-- React + TypeScript.
-- Vite.
-- Tailwind CSS.
-- CSS variables for theme tokens.
-- Zustand, TanStack Store, or a similarly small state solution if state management is needed.
-- Virtual scrolling for large process lists.
+- React + TypeScript。
+- Vite。
+- Tailwind CSS。
+- 使用 CSS 变量管理主题 Token。
+- 如果需要状态管理，使用 Zustand、TanStack Store 或类似的小型状态解决方案。
+- 对于大型进程列表使用虚拟滚动。
 
-Theme rules:
+主题规则：
 
-- All core colors, borders, radii, fonts, chart colors, meter tracks, and status colors must come from theme tokens.
-- Components may use CSS variables such as `var(--color-panel)` and `var(--color-cpu)`.
-- Do not hard-code btop-like green/yellow/purple status colors directly in components.
-- Adding a new theme preset should not require editing dashboard components.
+- 所有核心颜色、边框、圆角、字体、图表颜色、仪表轨道和状态颜色必须来自主题 Token。
+- 组件可以使用 CSS 变量，如 `var(--color-panel)` 和 `var(--color-cpu)`。
+- 不要在组件中直接硬编码类似 btop 的绿色/黄色/紫色等状态颜色。
+- 添加新的主题预设不应要求编辑仪表板组件。
 
-UI rules:
+UI 规则：
 
-- Build the actual monitoring app as the first screen, not a landing page.
-- Prefer dense, scannable operational UI over decorative marketing layouts.
-- Keep panels stable under live data updates; values should not resize the whole layout.
-- Support 1280x800 as a minimum useful desktop size.
-- Long process commands must truncate or wrap intentionally and must not break table layout.
-- Use clear empty, loading, connected, disconnected, auth failed, host key unknown, host key changed, and partial-data states.
+- 将实际的监控应用构建为首屏，而不是落地页。
+- 优先选择密集、易于扫描的操作 UI，而不是装饰性的营销布局。
+- 面板在实时数据更新下应保持稳定；数值的变化不应该导致整个布局调整大小。
+- 支持 1280x800 作为最小可用桌面尺寸。
+- 较长的进程命令必须有意识地截断或换行，绝对不能破坏表格布局。
+- 使用清晰的空状态、加载中、已连接、已断开、认证失败、未知主机密钥、主机密钥更改以及部分数据状态。
 
-Tauri access rules:
+Tauri 访问规则：
 
-- Components must not import Tauri APIs directly.
-- Use a frontend client abstraction for commands and events.
-- Keep mock and real clients behind the same interface.
+- 组件不能直接导入 Tauri API。
+- 对命令和事件使用前端客户端抽象。
+- 将 Mock 和真实客户端置于相同的接口后面。
 
-## Backend Constraints
+## 后端约束
 
-Use:
+使用：
 
-- Tauri v2.
-- Rust.
-- `serde` for command payloads and results.
-- `#[serde(rename_all = "camelCase")]` for structures sent to the frontend.
-- App config directory for non-sensitive local config.
-- macOS Keychain or a clearly wrapped credential store for sensitive values.
+- Tauri v2。
+- Rust。
+- `serde` 用于处理命令负载和结果。
+- 对于发送到前端的结构体使用 `#[serde(rename_all = "camelCase")]`。
+- 对于非敏感的本地配置，使用应用配置目录。
+- 对于敏感值，使用 macOS 钥匙串 (Keychain) 或清晰封装的凭据存储。
 
-SSH rules:
+SSH 规则：
 
-- MVP uses agentless SSH.
-- SSH work belongs in Rust, not the frontend.
-- Reuse SSH sessions per host where practical.
-- Do not create a new SSH connection per panel.
-- Do not allow the frontend to provide arbitrary command strings.
-- Represent remote commands with internal enums or fixed functions.
+- MVP 使用无 Agent 的 SSH。
+- SSH 逻辑属于 Rust，而不是前端。
+- 尽可能重用每个主机的 SSH 会话。
+- 不要为每个面板创建一个新的 SSH 连接。
+- 不允许前端提供任意命令字符串。
+- 使用内部枚举或固定函数表示远程命令。
 
-Allowed remote data sources for MVP include:
+MVP 允许的远程数据源包括：
 
 ```text
 /proc/stat
@@ -222,46 +222,46 @@ ps
 uname
 ```
 
-Security rules:
+安全规则：
 
-- Do not log passwords, private key contents, passphrases, tokens, or full credential refs.
-- Do not store password, private key contents, or passphrase in JSON/TOML config.
-- Treat `known_hosts` strictly by default.
-- Unknown host keys require user confirmation.
-- Changed host keys must block the connection unless the user explicitly resolves them.
-- MVP remote actions are read-only.
+- 不要记录 (log) 密码、私钥内容、密码短语、令牌或完整的凭据引用。
+- 不要在 JSON/TOML 配置中存储密码、私钥内容或密码短语。
+- 默认情况下严格对待 `known_hosts`。
+- 未知主机密钥需要用户确认。
+- 更改的主机密钥必须阻止连接，除非用户明确解决。
+- MVP 远程操作是只读的。
 
-Metrics rules:
+指标规则：
 
-- CPU percent must be calculated from deltas between `/proc/stat` samples.
-- Network rates must be calculated from deltas between `/proc/net/dev` samples.
-- Disk IO rates must be calculated from deltas between `/proc/diskstats` samples.
-- First samples may be warming samples, but should not crash the UI.
-- Parser failures must return structured errors, not panic.
+- CPU 百分比必须根据 `/proc/stat` 样本之间的增量 (deltas) 计算。
+- 网络速率必须根据 `/proc/net/dev` 样本之间的增量计算。
+- 磁盘 IO 速率必须根据 `/proc/diskstats` 样本之间的增量计算。
+- 首次采样可以是预热样本，但不应使 UI 崩溃。
+- 解析器失败必须返回结构化错误，而不是 panic。
 
-## Contract Rules
+## 契约规则
 
-The frontend/backend boundary is defined by `docs/roles/contracts.md`.
+前端/后端的边界由 `docs/roles/contracts.md` 定义。
 
-When changing a command, event, data shape, or error code:
+当更改命令、事件、数据形状或错误代码时：
 
-1. Update `docs/roles/contracts.md`.
-2. Update frontend TypeScript types.
-3. Update Rust serde structs.
-4. Update mock data and tests.
-5. Verify that old assumptions are not left in UI components or parser code.
+1. 更新 `docs/roles/contracts.md`。
+2. 更新前端 TypeScript 类型。
+3. 更新 Rust serde 结构体。
+4. 更新 Mock 数据和测试。
+5. 验证 UI 组件或解析器代码中是否遗留了旧的假设。
 
-Global contract conventions:
+全局契约约定：
 
-- Time fields use Unix milliseconds.
-- Byte fields use bytes.
-- Percent fields use numbers from `0` to `100`.
-- Commands return structured results or structured `AppError`.
-- Live metrics are pushed through Tauri events.
+- 时间字段使用 Unix 毫秒。
+- 字节字段使用字节。
+- 百分比字段使用从 `0` 到 `100` 的数字。
+- 命令返回结构化结果或结构化的 `AppError`。
+- 实时指标通过 Tauri 事件推送。
 
-## Error Handling
+## 错误处理
 
-Use stable error codes from the contract, including:
+使用来自契约的稳定错误代码，包括：
 
 - `CONFIG_INVALID`
 - `HOST_NOT_FOUND`
@@ -274,109 +274,109 @@ Use stable error codes from the contract, including:
 - `PARSER_FAILED`
 - `INTERNAL`
 
-Frontend should display user-oriented states from these codes. Backend should preserve useful debugging detail without leaking secrets.
+前端应该向用户展示这些代码对应的面向用户的状态。后端应该在不泄漏机密的情况下保留有用的调试细节。
 
-## Testing And Verification
+## 测试与验证
 
-Match verification to the changed area.
+测试验证工作应与更改的区域相匹配。
 
-Frontend changes:
+前端更改：
 
-- Run typecheck/build when available.
-- Verify mock mode renders dashboard states.
-- Check theme switching if styles or components changed.
-- Check responsive desktop sizes for dashboard layout changes.
+- 在可用时运行类型检查/构建 (typecheck/build)。
+- 验证 Mock 模式能否渲染仪表板状态。
+- 如果更改了样式或组件，请检查主题切换。
+- 检查桌面响应尺寸是否适应仪表板布局变化。
 
-Backend changes:
+后端更改：
 
-- Run Rust tests when available.
-- Add parser fixture tests for new parser behavior.
-- Verify command payload/result serialization against the contract.
-- Verify sensitive values are not written to config files or logs.
+- 在可用时运行 Rust 测试。
+- 为新的解析器行为添加解析器 fixture 测试。
+- 根据契约验证命令负载/结果的序列化。
+- 验证敏感值是否未写入配置文件或日志。
 
-Integration changes:
+集成更改：
 
-- Verify mock snapshots match `HostSnapshot`.
-- Verify Tauri commands and events match `docs/roles/contracts.md`.
-- If testing against a real VPS, compare key metrics with `top`, `free`, `df`, and `/proc/loadavg`.
+- 验证 Mock 快照是否匹配 `HostSnapshot`。
+- 验证 Tauri 命令和事件是否匹配 `docs/roles/contracts.md`。
+- 如果针对真实的 VPS 进行测试，请将关键指标与 `top`、`free`、`df` 和 `/proc/loadavg` 进行比较。
 
-Do not claim a task is complete if the relevant verification was not run or if the repository has not yet been scaffolded enough to run it. State what was verified and what could not yet be verified.
+如果未运行相关验证，或者代码库尚未搭建好以运行验证，请不要声称任务已完成。请说明已验证的内容以及尚未能验证的内容。
 
-When applicable, run validation in this order:
+在适用的情况下，按以下顺序运行验证：
 
-1. Targeted unit tests for changed behavior.
-2. Type checks or lint checks.
-3. Build checks for affected packages.
-4. A minimal smoke test.
+1. 针对更改行为的有针对性的单元测试。
+2. 类型检查或 Lint 检查。
+3. 受影响包的构建检查。
+4. 最小的冒烟测试。
 
-Backend unit tests must have a hard timeout of 60 seconds.
+后端单元测试必须有 60 秒的硬超时限制。
 
-Before finalizing, scan the diff for symptom patching, duplicated logic, hidden fallbacks, broad error swallowing, second sources of truth, dead code, unmentioned behavior changes, weak tests, and security regressions. Fix clear issues before responding.
+在最终确定之前，请扫描 diff，检查是否只修补了症状、逻辑重复、隐藏的 fallback、宽泛的吞没错误、第二个事实来源、死代码、未提及的行为更改、薄弱的测试以及安全回归。在回复之前修复明显的问题。
 
-## Implementation Style
+## 实现风格
 
-- Prefer small, explicit modules over broad abstractions.
-- Follow the role documents for step-by-step implementation.
-- Keep frontend formatting utilities separate from components.
-- Keep backend parsing separate from SSH execution.
-- Keep scheduler logic separate from one-shot collection logic.
-- Keep credential handling behind a narrow interface.
-- Avoid unrelated refactors.
-- Do not silently change the product scope.
-- Prefer short functions, shallow nesting, early returns, named constants, and few parameters.
-- Keep business logic decoupled from concrete implementations; inject dependencies through parameters or interfaces.
-- Prefer immutable data flow. Return new values instead of mutating parameters or global state.
-- Comments should explain intent or tradeoffs, not restate what the code already says.
-- Keep diffs targeted, but remove dead code when changing behavior unless compatibility is explicitly required.
-- Handle edge cases with clear failure paths instead of assuming ideal input.
+- 优先使用小型、明确的模块，而不是宽泛的抽象。
+- 遵循角色文档进行循序渐进的实现。
+- 保持前端格式化工具与组件分离。
+- 保持后端解析与 SSH 执行分离。
+- 保持调度器逻辑与一次性收集逻辑分离。
+- 将凭证处理放在一个狭窄的接口后面。
+- 避免无关的重构。
+- 不要静默更改产品范围。
+- 优先选择短函数、浅层嵌套、尽早返回、具名常量和较少的参数。
+- 保持业务逻辑与具体实现解耦；通过参数或接口注入依赖项。
+- 优先考虑不可变数据流。返回新值而不是改变参数或全局状态。
+- 注释应解释意图或权衡，而不是重述代码已经说明的内容。
+- 如果更改行为，除非明确需要兼容性，否则保持 diff 具有针对性，同时删除死代码。
+- 处理边缘情况时使用清晰的失败路径，而不是假设理想的输入。
 
-## Security Baseline
+## 安全基线
 
-- Never hardcode secrets, API keys, or credentials. Use environment variables, macOS Keychain, or an appropriate secret manager.
-- Use parameterized queries for database access if database code is added.
-- Never concatenate user input into SQL, local shell commands, or remote commands.
-- Validate and sanitize external input at system boundaries.
+- 切勿硬编码机密信息、API 密钥或凭证。使用环境变量、macOS 钥匙串 (Keychain) 或合适的机密管理器。
+- 如果添加了数据库代码，请使用参数化查询访问数据库。
+- 切勿将用户输入拼接到 SQL、本地 shell 命令或远程命令中。
+- 在系统边界验证并清理外部输入。
 
-## Dependency Guidance
+## 依赖指南
 
-Add dependencies only when they clearly reduce implementation risk or complexity.
+仅当能明显降低实现风险或复杂性时才添加依赖项。
 
-Reasonable frontend dependencies:
+合理的前端依赖：
 
 - `@tauri-apps/api`
-- `zustand` or another small state store
+- `zustand` 或其他小型状态库
 - `@tanstack/react-virtual`
 - `clsx`
-- Tailwind CSS tooling
+- Tailwind CSS 工具链
 
-Reasonable backend dependency areas:
+合理的后端依赖领域：
 
 - Tauri v2
 - serde/serde_json
-- UUID generation
-- time/date handling
-- SSH client implementation
-- macOS Keychain integration
-- async runtime utilities as required by Tauri
+- UUID 生成
+- 时间/日期处理
+- SSH 客户端实现
+- macOS Keychain 集成
+- Tauri 要求的异步运行时工具
 
-Before adding heavy UI kits, charting frameworks, databases, or background agent frameworks, check that they fit the MVP scope.
+在添加繁重的 UI 套件、图表框架、数据库或后台 Agent 框架之前，请检查它们是否符合 MVP 范围。
 
-## Documentation Rules
+## 文档规则
 
-- Keep `docs/vpscope-plan.md` aligned with major product or architecture changes.
-- Keep role docs aligned with directory and ownership changes.
-- Keep `docs/roles/contracts.md` aligned with any command/event/data changes.
-- Prefer documenting decisions next to the role affected by the decision.
+- 保持 `docs/vpscope-plan.md` 与主要产品或架构更改对齐。
+- 保持角色文档与目录和所有权更改对齐。
+- 保持 `docs/roles/contracts.md` 与任何命令/事件/数据更改对齐。
+- 优先在受决定影响的角色旁边记录决定。
 
-## Hard Red Lines
+## 硬性红线
 
-Do not:
+不要做：
 
-- Put SSH logic in the frontend.
-- Let the frontend execute arbitrary local or remote shell commands.
-- Store secrets in normal config files.
-- Skip known_hosts handling.
-- Implement destructive remote operations in the MVP.
-- Hard-code the visual theme into dashboard components.
-- Replace the app with a landing page or generic admin template.
-- Change the interface contract without updating docs, frontend types, backend structs, mocks, and tests.
+- 将 SSH 逻辑放在前端。
+- 允许前端执行任意的本地或远程 shell 命令。
+- 将机密信息存储在普通配置文件中。
+- 跳过 known_hosts 处理。
+- 在 MVP 中实现破坏性的远程操作。
+- 将视觉主题硬编码到仪表板组件中。
+- 用登陆页面或通用管理模板替换该应用程序。
+- 在不更新文档、前端类型、后端结构体、Mocks 和测试的情况下更改接口契约。

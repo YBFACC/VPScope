@@ -1,50 +1,50 @@
-# VPScope Btop Pixel Style
+# VPScope Btop 像素风格
 
-This file is the visual contract for the btop-inspired VPScope interface. It is a styling constraint, not a product or data-contract document.
+本文件是受 btop 启发而设计的 VPScope 界面的视觉契约。这是一份样式约束，而非产品或数据契约文档。
 
-## Direction
+## 设计方向
 
-- Build the monitoring UI as a dense terminal cockpit, closer to btop than to a macOS preferences panel.
-- Prefer immediate operational readability over decorative space.
-- Keep the app visually dark, high contrast, and token-driven.
-- Treat every panel as a one-pixel terminal frame with a compact title strip.
-- Preserve all existing behavior: sorting, hiding, subscriptions, keyboard affordances, mock data, and backend contracts must not change for style work.
+- 将监控 UI 构建为一个密集的终端控制面板，风格更接近 btop，而不是 macOS 的偏好设置面板。
+- 优先考虑即时的操作可读性，而非装饰性的留白。
+- 保持应用程序视觉上的深色调、高对比度和由 Token（变量）驱动。
+- 将每个面板视为一个带有紧凑标题条的单像素终端框架。
+- 必须保留所有现有行为：排序、隐藏、订阅、键盘交互、模拟数据和后端契约，绝对不能因为样式工作而改变。
 
-## Tokens
+## Tokens (设计变量)
 
-- All core colors must come from theme variables in `web/src/theme/presets.ts` and `web/src/styles.css`.
-- Component code may use variables such as `var(--color-cpu)`, `var(--color-panel)`, and `var(--color-border)`.
-- Do not hard-code new status, chart, or meter colors directly in dashboard components.
-- Keep radii tiny: panels and controls should read as square or pixel-cut, not pill-shaped.
-- Use mono-first typography. UI copy, numbers, headings, buttons, charts, and tables should default to the mono stack.
+- 所有核心颜色必须来自 `web/src/theme/presets.ts` 和 `web/src/styles.css` 中的主题变量。
+- 组件代码可以使用如 `var(--color-cpu)`、`var(--color-panel)` 和 `var(--color-border)` 等变量。
+- 不要直接在仪表板组件中硬编码新的状态、图表或仪表的颜色。
+- 保持极小的圆角：面板和控件应该看起来是方形或像素切割的，而不是药丸形状的。
+- 优先使用等宽字体。UI 文本、数字、标题、按钮、图表和表格应默认使用等宽字体栈。
 
-## Surfaces
+## 表面与层级
 
-- Background: near-black terminal base with subtle scanlines and a faint grid.
-- Panels: single-pixel borders, inner bevels, and strong title strips.
-- Shadows: minimal. Use glow only as a status signal, not as soft-card decoration.
-- Cards: only for repeated operational items such as hosts, disks, interfaces, settings rows, and process table rows.
-- Avoid glassmorphism, big blurred surfaces, marketing-card layouts, oversized hero typography, and large whitespace.
+- 背景：接近黑色的终端底色，带有微妙的扫描线和淡淡的网格。
+- 面板：单像素边框、内部斜面和醒目的标题条。
+- 阴影：尽量减少。仅将发光作为状态信号，而不是作为柔和卡片的装饰。
+- 卡片：仅用于重复的操作项，如主机、磁盘、网络接口、设置行和进程表格行。
+- 避免使用玻璃拟物化 (glassmorphism)、大面积模糊表面、营销卡片布局、超大排版以及大面积空白。
 
-## Charts And Meters
+## 图表与仪表
 
-- Time charts should use a btop-like dot matrix: each column is a time sample, and filled versus empty cells represent resource usage at that moment.
-- The newest samples should read clearly at the right edge, while older samples may be slightly dimmer.
-- Avoid smooth curves for resource history unless a later task explicitly asks for them.
-- Meters should use segmented blocks or terminal bars rather than smooth progress pills.
-- Rings should remain data-driven but look more like a compact terminal gauge than a soft donut chart.
-- Live updates must not resize panels or shift surrounding layout.
+- 时间图表应使用类似 btop 的点阵：每一列是一个时间采样，填充与空白的单元格代表该时刻的资源使用情况。
+- 最新的采样应该在右侧边缘清晰可见，而较旧的采样可以稍微变暗。
+- 避免资源历史记录出现平滑曲线，除非后续任务明确要求。
+- 仪表应使用分段块或终端条，而不是平滑的进度条。
+- 环形图应保持数据驱动，但看起来要更像一个紧凑的终端仪表，而不是柔和的甜甜圈图。
+- 实时更新绝对不能调整面板大小或移动周围的布局。
 
-## Tables
+## 表格
 
-- Tables are dense by default.
-- Headers use uppercase mono text with clear dividers.
-- Focused/active rows use a left pixel rail and tokenized accent color.
-- Long commands must stay intentionally truncated and must not break the grid.
+- 表格默认是密集的。
+- 表头使用大写的等宽文本，带有清晰的分隔线。
+- 聚焦/激活的行使用左侧像素导轨和 Token 化的强调色。
+- 较长的命令必须保持有意的截断，绝对不能破坏网格。
 
-## Verification
+## 验证
 
-- Mock mode must render both overview and list views.
-- 1280x800 must remain usable.
-- CPU, memory, disk, network, and process panels must fit without text overlap.
-- Process search/sort/focus and panel hide/reorder behavior must remain unchanged.
+- 模拟模式必须能够渲染概览和列表视图。
+- 必须在 1280x800 分辨率下保持可用性。
+- CPU、内存、磁盘、网络和进程面板必须能够完全适应且文本不重叠。
+- 进程搜索/排序/聚焦和面板隐藏/重新排序行为必须保持不变。
