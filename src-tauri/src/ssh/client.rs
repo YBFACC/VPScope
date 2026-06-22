@@ -27,7 +27,7 @@ pub struct ConnectionInfo {
     pub fingerprint: Option<String>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RemoteCommand {
     ProcStat,
     ProcMeminfo,
@@ -38,20 +38,35 @@ pub enum RemoteCommand {
     Df,
     Ps,
     Uname,
+    DockerContainerList,
+    DockerContainerLogs {
+        container_id: String,
+        tail_lines: u16,
+    },
 }
 
 impl RemoteCommand {
-    pub fn as_fixed_command(self) -> &'static str {
+    pub fn as_fixed_command(&self) -> String {
         match self {
-            Self::ProcStat => "cat /proc/stat",
-            Self::ProcMeminfo => "cat /proc/meminfo",
-            Self::ProcLoadavg => "cat /proc/loadavg",
-            Self::ProcUptime => "cat /proc/uptime",
-            Self::ProcNetDev => "cat /proc/net/dev",
-            Self::ProcDiskstats => "cat /proc/diskstats",
-            Self::Df => "df -P",
-            Self::Ps => "ps -eo pid,ppid,user,stat,pcpu,pmem,rss,args",
-            Self::Uname => "uname -a",
+            Self::ProcStat => "cat /proc/stat".to_string(),
+            Self::ProcMeminfo => "cat /proc/meminfo".to_string(),
+            Self::ProcLoadavg => "cat /proc/loadavg".to_string(),
+            Self::ProcUptime => "cat /proc/uptime".to_string(),
+            Self::ProcNetDev => "cat /proc/net/dev".to_string(),
+            Self::ProcDiskstats => "cat /proc/diskstats".to_string(),
+            Self::Df => "df -P".to_string(),
+            Self::Ps => "ps -eo pid,ppid,user,stat,pcpu,pmem,rss,args".to_string(),
+            Self::Uname => "uname -a".to_string(),
+            Self::DockerContainerList => {
+                "docker ps -a --format {{.ID}}\\t{{.Names}}\\t{{.Image}}\\t{{.State}}\\t{{.Status}}"
+                    .to_string()
+            }
+            Self::DockerContainerLogs {
+                container_id,
+                tail_lines,
+            } => {
+                format!("docker logs --tail {tail_lines} {container_id}")
+            }
         }
     }
 }
@@ -400,7 +415,7 @@ impl OpenSshClient {
 
     async fn exec_remote_command(
         session: &Session,
-        command: RemoteCommand,
+        command: &RemoteCommand,
     ) -> Result<String, AppError> {
         match command {
             RemoteCommand::ProcStat => Self::exec_program(session, "cat", &["/proc/stat"]).await,
@@ -429,6 +444,31 @@ impl OpenSshClient {
                 .await
             }
             RemoteCommand::Uname => Self::exec_program(session, "uname", &["-a"]).await,
+            RemoteCommand::DockerContainerList => {
+                Self::exec_program(
+                    session,
+                    "docker",
+                    &[
+                        "ps",
+                        "-a",
+                        "--format",
+                        "{{.ID}}\t{{.Names}}\t{{.Image}}\t{{.State}}\t{{.Status}}",
+                    ],
+                )
+                .await
+            }
+            RemoteCommand::DockerContainerLogs {
+                container_id,
+                tail_lines,
+            } => {
+                let tail_lines = tail_lines.to_string();
+                Self::exec_program(
+                    session,
+                    "docker",
+                    &["logs", "--tail", tail_lines.as_str(), container_id.as_str()],
+                )
+                .await
+            }
         }
     }
 
@@ -438,12 +478,12 @@ impl OpenSshClient {
         command: RemoteCommand,
     ) -> Result<String, AppError> {
         let session = self.session_for(host).await?;
-        match Self::exec_remote_command(&session, command).await {
+        match Self::exec_remote_command(&session, &command).await {
             Ok(output) => Ok(output),
             Err(error) if should_retry_with_fresh_session(&error) => {
                 self.drop_cached_session(&host.id)?;
                 let session = self.session_for(host).await?;
-                Self::exec_remote_command(&session, command).await
+                Self::exec_remote_command(&session, &command).await
             }
             Err(error) => Err(error),
         }

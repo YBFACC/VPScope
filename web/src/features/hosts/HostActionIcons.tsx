@@ -39,3 +39,13 @@ export function TerminalIcon(props: SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+
+export function DockerIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true" {...props}>
+      <path d="M2.5 7.25h11l-.75 3.25a3 3 0 0 1-2.9 2.25H5.1A3 3 0 0 1 2.2 10.5L1.75 8.75" />
+      <path d="M4 5.25h2.25v2H4zM6.25 5.25H8.5v2H6.25zM8.5 5.25h2.25v2H8.5zM6.25 3.25H8.5v2H6.25z" />
+      <path d="M12.25 6.25c.55-.85 1.2-1.15 2-1" />
+    </svg>
+  );
+}

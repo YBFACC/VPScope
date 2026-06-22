@@ -229,6 +229,36 @@ export type ProcessInfo = {
   startedAt?: number;
 };
 
+export type DockerLogTailLines = 100 | 300 | 1000;
+
+export type DockerContainer = {
+  id: string;
+  name: string;
+  image: string;
+  state: string;
+  status: string;
+};
+
+export type DockerContainerListPayload = {
+  hostId: HostId;
+};
+
+export type DockerContainerListResult = DockerContainer[];
+
+export type DockerContainerLogsPayload = {
+  hostId: HostId;
+  containerId: string;
+  tailLines: DockerLogTailLines;
+};
+
+export type DockerContainerLogsResult = {
+  hostId: HostId;
+  containerId: string;
+  tailLines: DockerLogTailLines;
+  logs: string;
+  fetchedAt: number;
+};
+
 export type SampleState = "warming" | "live";
 
 export type HostSnapshot = {
@@ -301,6 +331,8 @@ export type VpscopeCommandPayloads = {
   metrics_subscribe: MetricsSubscribePayload;
   metrics_unsubscribe: MetricsUnsubscribePayload;
   process_list: ProcessListPayload;
+  docker_container_list: DockerContainerListPayload;
+  docker_container_logs: DockerContainerLogsPayload;
   tray_settings_get: Record<string, never>;
   tray_settings_update: TraySettingsUpdatePayload;
   alert_settings_get: Record<string, never>;
@@ -323,6 +355,8 @@ export type VpscopeCommandResults = {
   metrics_subscribe: MetricsSubscribeResult;
   metrics_unsubscribe: MetricsUnsubscribeResult;
   process_list: ProcessListResult;
+  docker_container_list: DockerContainerListResult;
+  docker_container_logs: DockerContainerLogsResult;
   tray_settings_get: TraySettings;
   tray_settings_update: TraySettings;
   alert_settings_get: AlertSettings;

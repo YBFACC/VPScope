@@ -3,6 +3,8 @@ import { createMockSnapshot } from "@/mocks/mockSnapshots";
 import type { VPScopeClient } from "@/lib/tauriClient";
 import type {
   AlertSettings,
+  DockerContainer,
+  DockerContainerLogsPayload,
   HostConfig,
   HostCreatePayload,
   HostId,
@@ -33,6 +35,44 @@ let alertSettings: AlertSettings = {
 let terminalSettings: TerminalSettings = {
   app: "terminal_app",
 };
+
+const mockDockerContainers: DockerContainer[] = [
+  {
+    id: "a83f7fca5fb1",
+    name: "flux-logic-api",
+    image: "flux-logic-api:latest",
+    state: "running",
+    status: "Up 5 hours",
+  },
+  {
+    id: "fb2e571ebd80",
+    name: "flux-logic-web",
+    image: "flux-logic-web:latest",
+    state: "running",
+    status: "Up 5 hours",
+  },
+  {
+    id: "d51dbaf8b331",
+    name: "flux-logic-scheduler",
+    image: "flux-logic-scheduler:latest",
+    state: "running",
+    status: "Up 4 hours",
+  },
+  {
+    id: "7ba2c7b6dbad",
+    name: "flux-logic-db",
+    image: "postgres:16",
+    state: "exited",
+    status: "Exited (0) 2 hours ago",
+  },
+  {
+    id: "beef5c09d442",
+    name: "flux-logic-rsshub",
+    image: "diygod/rsshub:latest",
+    state: "created",
+    status: "Created",
+  },
+];
 
 function wait(ms = 180) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -97,6 +137,25 @@ function sortProcesses(payload: ProcessListPayload) {
   });
 
   return typeof payload.limit === "number" ? sorted.slice(0, payload.limit) : sorted;
+}
+
+function createMockDockerLogs(payload: DockerContainerLogsPayload) {
+  const container = mockDockerContainers.find((item) => item.id === payload.containerId || item.name === payload.containerId);
+  const name = container?.name ?? payload.containerId;
+  const lines = [
+    `[2026-06-23T02:31:00 UTC+8] [INFO] [${name}] service booted with profile=production`,
+    `[2026-06-23T02:32:00 UTC+8] [INFO] [${name}] health check passed latency=38ms`,
+    `[2026-06-23T02:33:00 UTC+8] [WARN] [${name}] retrying upstream request attempt=2`,
+    `[2026-06-23T02:34:00 UTC+8] [ERROR] [${name}] failed for article=cmq9s3z96006mnz1z1ousb4ay: TOPIC_API_KEY is not configured.`,
+    `[2026-06-23T02:35:00 UTC+8] [ERROR] [${name}] failed for article=cmq9s3z92006lnz1zq6806ywq: TOPIC_API_KEY is not configured.`,
+    `[2026-06-23T02:36:00 UTC+8] [INFO] [${name}] completed: scanned=295 selected=295 concurrency=1 success=0 skipped=0 failed=295`,
+  ];
+  const repeatedLines = Array.from({ length: Math.min(payload.tailLines, 48) }, (_, index) => {
+    const line = lines[index % lines.length];
+    return `${line} trace=${(index + 1).toString().padStart(3, "0")}`;
+  });
+
+  return repeatedLines.join("\n");
 }
 
 function createSubscriptionSnapshot(hostId: HostId, profile = "active") {
@@ -290,6 +349,20 @@ export function createMockTauriClient(): VPScopeClient {
     async listProcesses(payload) {
       await wait(120);
       return sortProcesses(payload);
+    },
+    async listDockerContainers() {
+      await wait(180);
+      return mockDockerContainers.map((container) => ({ ...container }));
+    },
+    async getDockerContainerLogs(payload) {
+      await wait(220);
+      return {
+        hostId: payload.hostId,
+        containerId: payload.containerId,
+        tailLines: payload.tailLines,
+        logs: createMockDockerLogs(payload),
+        fetchedAt: Date.now(),
+      };
     },
     async getTraySettings() {
       await wait(80);

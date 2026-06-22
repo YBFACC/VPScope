@@ -1,6 +1,6 @@
 import { useState } from "react";
 import clsx from "clsx";
-import { ChevronDownIcon, ChevronUpIcon, TerminalIcon, TrashIcon } from "@/features/hosts/HostActionIcons";
+import { ChevronDownIcon, ChevronUpIcon, DockerIcon, TerminalIcon, TrashIcon } from "@/features/hosts/HostActionIcons";
 import { HostConnectionBadge } from "@/features/hosts/HostConnectionBadge";
 import { useI18n } from "@/i18n/useI18n";
 import { formatDuration, formatPercent, formatRate } from "@/lib/format";
@@ -18,6 +18,7 @@ type OverviewPageProps = {
   errorsByHost: Record<string, AppError | undefined>;
   isSubscribing: boolean;
   onOpenHost: (hostId: string) => void;
+  onOpenDockerLogs: (hostId: string) => void;
 };
 
 type HostHealth = "hot" | "warn" | "ok" | "waiting" | "error";
@@ -310,6 +311,7 @@ export function OverviewPage({
   errorsByHost,
   isSubscribing,
   onOpenHost,
+  onOpenDockerLogs,
 }: OverviewPageProps) {
   const { t } = useI18n();
   const moveHost = useHostStore((state) => state.moveHost);
@@ -473,6 +475,18 @@ export function OverviewPage({
                     aria-label={openingHostIds[host.id] ? t("openingTerminal") : t("openTerminal")}
                   >
                     {openingHostIds[host.id] ? <span className="host-icon-loading" /> : <TerminalIcon />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onOpenDockerLogs(host.id);
+                    }}
+                    className="host-icon-button"
+                    title={t("openDockerLogs")}
+                    aria-label={t("openDockerLogs")}
+                  >
+                    <DockerIcon />
                   </button>
                   <button
                     type="button"

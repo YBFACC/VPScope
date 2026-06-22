@@ -2,6 +2,7 @@ import type { ReactElement } from "react";
 import { useEffect, useState } from "react";
 import { EmptyState } from "@/components/empty/EmptyState";
 import { TopToolbar } from "@/components/toolbar/TopToolbar";
+import { DockerLogsWorkspace } from "@/features/docker/DockerLogsWorkspace";
 import { HostForm } from "@/features/hosts/HostForm";
 import { OverviewPage } from "@/features/overview/OverviewPage";
 import { useI18n } from "@/i18n/useI18n";
@@ -29,6 +30,7 @@ export function DashboardPage() {
     () => typeof document === "undefined" || document.visibilityState !== "hidden",
   );
   const [hostFormOpen, setHostFormOpen] = useState(false);
+  const [dockerWorkspaceHostId, setDockerWorkspaceHostId] = useState<string>();
   const [dismissedHostKey, setDismissedHostKey] = useState<string>();
   const [isAcceptingHostKey, setIsAcceptingHostKey] = useState(false);
   const [hostKeyMessage, setHostKeyMessage] = useState<string>();
@@ -36,6 +38,7 @@ export function DashboardPage() {
   const isLoadingHosts = useHostStore((state) => state.isLoading);
   const hosts = useHostStore((state) => state.hosts);
   const selectedHost = useSelectedHost();
+  const dockerWorkspaceHost = hosts.find((host) => host.id === dockerWorkspaceHostId);
   const selectedHostId = useHostStore((state) => state.selectedHostId);
   const connection = useHostStore((state) => (selectedHostId ? state.connectionStates[selectedHostId] : undefined));
   const connectionStates = useHostStore((state) => state.connectionStates);
@@ -377,6 +380,7 @@ export function DashboardPage() {
                   selectHost(hostId);
                   setViewMode("list");
                 }}
+                onOpenDockerLogs={setDockerWorkspaceHostId}
               />
             ) : !selectedHost || !snapshot ? (
               <EmptyState
@@ -398,6 +402,9 @@ export function DashboardPage() {
           </section>
         </div>
       </div>
+      {dockerWorkspaceHost ? (
+        <DockerLogsWorkspace host={dockerWorkspaceHost} onClose={() => setDockerWorkspaceHostId(undefined)} />
+      ) : null}
       <HostForm open={hostFormOpen} onClose={() => setHostFormOpen(false)} />
     </main>
   );

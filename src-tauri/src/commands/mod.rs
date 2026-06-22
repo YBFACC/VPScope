@@ -1,8 +1,10 @@
+pub mod docker;
 pub mod hosts;
 pub mod metrics;
 pub mod processes;
 pub mod settings;
 
+pub use docker::{docker_container_list, docker_container_logs};
 pub use hosts::{
     host_accept_key, host_create, host_delete, host_list, host_open_terminal, host_reorder,
     host_ssh_config_list, host_test_connection, host_update,

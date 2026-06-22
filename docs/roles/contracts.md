@@ -93,6 +93,24 @@ export type ProcessInfo = {
   startedAt?: number;
 };
 
+export type DockerLogTailLines = 100 | 300 | 1000;
+
+export type DockerContainer = {
+  id: string;
+  name: string;
+  image: string;
+  state: string;
+  status: string;
+};
+
+export type DockerContainerLogsResult = {
+  hostId: HostId;
+  containerId: string;
+  tailLines: DockerLogTailLines;
+  logs: string;
+  fetchedAt: number;
+};
+
 export type SampleState = "warming" | "live";
 
 export type HostSnapshot = {
@@ -590,6 +608,56 @@ type ProcessListPayload = {
 
 ```ts
 type ProcessListResult = ProcessInfo[];
+```
+
+### `docker_container_list`
+
+用途：通过已保存 host 的 SSH 连接读取远端 Docker 容器列表。该命令只执行后端固定白名单 Docker 查询，不允许前端传入任意命令。
+
+请求：
+
+```ts
+type DockerContainerListPayload = {
+  hostId: HostId;
+};
+```
+
+响应：
+
+```ts
+type DockerContainerListResult = Array<{
+  id: string;
+  name: string;
+  image: string;
+  state: string;
+  status: string;
+}>;
+```
+
+### `docker_container_logs`
+
+用途：读取某个 Docker 容器最近的原始日志。第一版不使用 `docker logs -f`，只做有界 tail 查询。
+
+请求：
+
+```ts
+type DockerContainerLogsPayload = {
+  hostId: HostId;
+  containerId: string;
+  tailLines: 100 | 300 | 1000;
+};
+```
+
+响应：
+
+```ts
+type DockerContainerLogsResult = {
+  hostId: HostId;
+  containerId: string;
+  tailLines: 100 | 300 | 1000;
+  logs: string;
+  fetchedAt: number;
+};
 ```
 
 ## Events
