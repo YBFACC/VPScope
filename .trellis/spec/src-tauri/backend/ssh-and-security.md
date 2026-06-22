@@ -93,6 +93,68 @@ pub enum RemoteCommand {
 }
 ```
 
+## Scenario: 只读 Docker 日志命令
+
+### 1. Scope / Trigger
+
+- Trigger: Docker 日志查看器新增跨层 command，并通过 SSH 执行远程 Docker CLI。
+- Scope: 只允许列容器和读取 bounded tail logs；不允许 stop/start/restart/delete/exec/follow。
+- Safety: Docker 命令必须由后端固定构造，前端不能传入 shell 字符串或任意 Docker 子命令。
+
+### 2. Signatures
+
+```rust
+docker_container_list(host_id: String) -> Result<Vec<DockerContainer>, AppError>
+docker_container_logs(host_id: String, container_id: String, tail_lines: DockerLogTailLines) -> Result<DockerContainerLogsResult, AppError>
+```
+
+### 3. Contracts
+
+- `docker_container_list` request: `hostId: string`
+- `docker_container_list` response item: `id`, `name`, `image`, `state`, `status`, optional `createdAt`
+- `docker_container_logs` request: `hostId: string`, `containerId: string`, `tailLines: 100 | 300 | 1000`
+- `docker_container_logs` response: `hostId`, `containerId`, `tailLines`, `logs`, `fetchedAt` (Unix milliseconds)
+- `containerId` must come from discovered Docker containers and must be validated before command construction.
+
+### 4. Validation & Error Matrix
+
+- Missing host -> `HOST_NOT_FOUND`
+- Empty / unsafe `containerId` -> `CONFIG_INVALID`
+- Unsupported `tailLines` -> `CONFIG_INVALID`
+- Missing Docker binary / unsupported remote -> `REMOTE_UNSUPPORTED`
+- Docker permission denied or command failure -> `REMOTE_COMMAND_FAILED`
+- SSH authentication / connection / host-key failures -> existing SSH error mapping
+
+### 5. Good/Base/Bad Cases
+
+- Good: `docker_container_logs(host, "abc123", 300)` fetches raw recent logs without enabling follow mode.
+- Base: exited containers are listed and can still return historical logs.
+- Bad: any payload field that tries to include shell metacharacters, Docker subcommands, or arbitrary flags must be rejected before SSH execution.
+
+### 6. Tests Required
+
+- Parser test: running containers sort before non-running containers.
+- Parser test: malformed container list rows fail with a stable `PARSER_FAILED` / command error path.
+- Validation test: only `100`, `300`, `1000` tail sizes are accepted.
+- Validation test: empty or unsafe container identifiers are rejected.
+- Contract check: docs, TypeScript types, Rust serde structs, mocks, and command registration are updated together.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```rust
+// Frontend-controlled command string can smuggle arbitrary shell.
+ssh.exec(host_id, RemoteCommand::Raw(format!("docker logs {}", payload.command)));
+```
+
+#### Correct
+
+```rust
+// Backend-owned command shape; only bounded tail and validated container id vary.
+ssh.exec(host_id, RemoteCommand::DockerLogs { container_id, tail_lines });
+```
+
 验收：
 
 - 前端无法让后端执行任意 shell。
