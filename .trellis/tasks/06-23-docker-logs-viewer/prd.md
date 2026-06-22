@@ -24,6 +24,8 @@ Add a fast Docker logs workspace to VPScope so a user can inspect container logs
 - Support a bounded tail size selector for logs: 100 / 300 / 1000 lines, defaulting to 300 lines.
 - Show raw container logs by default; do not force Docker timestamps in the first version.
 - Support manual refresh for containers and logs.
+- Support optional timed log refresh at 1 / 3 / 5 second intervals, disabled by default.
+- After switching containers or refreshing logs, show the newest log entry by default by keeping the log output scrolled to the bottom.
 - Do not implement streaming log follow in the first version.
 - Support client-side log search/filtering.
 - Keep remote Docker actions read-only for this MVP.
@@ -57,6 +59,8 @@ Add a fast Docker logs workspace to VPScope so a user can inspect container logs
 - [x] The log workspace defaults to 300 log lines and lets the user switch between 100 / 300 / 1000 lines.
 - [x] Logs are displayed as raw container output without adding Docker timestamps by default.
 - [x] Refreshing containers/logs works without restarting the app.
+- [x] Optional timed log refresh supports 1 / 3 / 5 second intervals and is disabled by default.
+- [x] Switching containers or refreshing logs scrolls the log output to the bottom so the newest entry is visible.
 - [x] The first version does not keep a long-running `docker logs -f` subscription open.
 - [x] Searching/filtering visible log text works locally.
 - [x] Hosts without Docker or Docker permission show a recoverable error state.
@@ -66,12 +70,13 @@ Add a fast Docker logs workspace to VPScope so a user can inspect container logs
 
 ## Resolved Decisions
 
-- First version is manual-refresh based; no streaming `docker logs -f` subscription.
+- First version supports manual refresh plus optional 1 / 3 / 5 second polling; no streaming `docker logs -f` subscription.
 - Docker logs entry lives beside the existing per-host open-terminal action, not as a top-level global view switch.
 - Docker logs opens in a full-screen overlay workspace.
 - Container list includes all containers and sorts running containers first by default.
 - Log tail size is selectable, with 300 lines as the default.
 - Logs display raw container output by default.
+- Log output stays pinned to the newest entry after container switches and log refreshes.
 
 ## Open Questions
 

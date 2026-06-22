@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import { XIcon } from "@/features/hosts/HostActionIcons";
 import { useI18n } from "@/i18n/useI18n";
@@ -13,6 +13,9 @@ import type {
 } from "@/types/contracts";
 
 const tailOptions: DockerLogTailLines[] = [100, 300, 1000];
+const autoRefreshOptions = [0, 1_000, 3_000, 5_000] as const;
+
+type AutoRefreshMs = (typeof autoRefreshOptions)[number];
 
 type DockerLogsWorkspaceProps = {
   host: HostConfig;
@@ -21,10 +24,12 @@ type DockerLogsWorkspaceProps = {
 
 export function DockerLogsWorkspace({ host, onClose }: DockerLogsWorkspaceProps) {
   const { t } = useI18n();
+  const logOutputRef = useRef<HTMLPreElement>(null);
   const [containers, setContainers] = useState<DockerContainer[]>([]);
   const [selectedContainerId, setSelectedContainerId] = useState<string>();
   const [logsResult, setLogsResult] = useState<DockerContainerLogsResult>();
   const [tailLines, setTailLines] = useState<DockerLogTailLines>(300);
+  const [autoRefreshMs, setAutoRefreshMs] = useState<AutoRefreshMs>(0);
   const [search, setSearch] = useState("");
   const [isLoadingContainers, setIsLoadingContainers] = useState(false);
   const [isLoadingLogs, setIsLoadingLogs] = useState(false);
@@ -99,6 +104,31 @@ export function DockerLogsWorkspace({ host, onClose }: DockerLogsWorkspaceProps)
   }, [loadContainers]);
 
   useEffect(() => {
+    if (!autoRefreshMs || !selectedContainerId) {
+      return undefined;
+    }
+
+    const intervalId = window.setInterval(() => {
+      if (!isLoadingLogs) {
+        void loadLogs(selectedContainerId);
+      }
+    }, autoRefreshMs);
+
+    return () => window.clearInterval(intervalId);
+  }, [autoRefreshMs, isLoadingLogs, loadLogs, selectedContainerId]);
+
+  useEffect(() => {
+    const frameId = window.requestAnimationFrame(() => {
+      const output = logOutputRef.current;
+      if (output) {
+        output.scrollTop = output.scrollHeight;
+      }
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [logsResult?.fetchedAt, selectedContainerId, tailLines, visibleLogLines.length]);
+
+  useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         event.preventDefault();
@@ -150,7 +180,20 @@ export function DockerLogsWorkspace({ host, onClose }: DockerLogsWorkspaceProps)
                 </button>
               ))}
             </div>
-            <button type="button" className="control-button" onClick={() => void loadContainers()}>
+            <div className="docker-refresh-switch" aria-label={t("autoRefresh")}>
+              {autoRefreshOptions.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => setAutoRefreshMs(option)}
+                  data-active={option === autoRefreshMs}
+                  title={t("autoRefresh")}
+                >
+                  {option === 0 ? t("off") : t("secondsShort", { count: option / 1_000 })}
+                </button>
+              ))}
+            </div>
+            <button type="button" className="control-button docker-manual-refresh-button" onClick={() => void loadContainers()}>
               {isLoadingContainers || isLoadingLogs ? t("refreshing") : t("refresh")}
             </button>
             <button
@@ -230,7 +273,7 @@ export function DockerLogsWorkspace({ host, onClose }: DockerLogsWorkspaceProps)
             ) : isLoadingLogs && !logsResult ? (
               <div className="docker-empty">{t("loadingLogs")}</div>
             ) : selectedContainer ? (
-              <pre className="docker-log-output">
+              <pre ref={logOutputRef} className="docker-log-output">
                 {visibleLogLines.length > 0
                   ? visibleLogLines.map((line, index) => (
                       <LogLine key={`${index}-${line}`} line={line} needle={searchNeedle} isLast={index === visibleLogLines.length - 1} />
