@@ -23,6 +23,8 @@
 |-------|---------|-------------|
 | [代码复用思考指南](./code-reuse-thinking-guide.md) | 识别模式并减少重复代码 | 当你注意到重复的模式时 |
 | [跨层级思考指南](./cross-layer-thinking-guide.md) | 理清跨层级的数据流向 | 功能涉及多个层级时 |
+| [产品范围规范](./product-scope.md) | 归档 VPScope 的产品定位、MVP 范围、硬性红线和事实来源 | 开始任何前端、后端、契约或文档任务前 |
+| [契约与联调规范](./contract-and-integration.md) | 保持前端、Rust 后端、Mock、parser fixture 和文档一致 | 修改命令、事件、数据形状、错误码、Mock、parser 输出或跨边界行为时 |
 
 ---
 

@@ -1,39 +1,32 @@
 # 前端开发规范 (Frontend Development Guidelines)
 
-> 本项目中前端开发最佳实践。
+> 来源：已归档的 `AGENTS.md`、`Style.md`、`docs/roles/frontend.md`、`docs/roles/contracts.md`、`web/src/`。
 
----
-
-## 概述
-
-此目录包含前端开发规范文档。请根据项目的具体约定填写每个文件。
-
----
+本目录只归档 `/web` 前端约束。项目约束使用来源文档原句，不做词替换。
 
 ## 规范索引
 
 | 规范 | 描述 | 状态 |
 |-------|-------------|--------|
-| [目录结构](./directory-structure.md) | 模块组织和文件布局 | 待补充 |
-| [组件规范](./component-guidelines.md) | 组件模式、Props、组合 | 待补充 |
-| [Hook 规范](./hook-guidelines.md) | 自定义 Hook、数据获取模式 | 待补充 |
-| [状态管理](./state-management.md) | 本地状态、全局状态、服务器状态 | 待补充 |
-| [质量规范](./quality-guidelines.md) | 代码标准、禁用模式 | 待补充 |
-| [类型安全](./type-safety.md) | 类型模式、校验 | 待补充 |
+| [目录结构](./directory-structure.md) | `/web` 目录边界、推荐目录和当前文件示例 | 已归档 |
+| [组件规范](./component-guidelines.md) | Dashboard、组件、样式、无障碍和视觉约束 | 已归档 |
+| [Hook 规范](./hook-guidelines.md) | Hook 与 Tauri client 抽象边界 | 已归档 |
+| [状态管理](./state-management.md) | Zustand store、snapshot、history 和订阅状态 | 已归档 |
+| [质量规范](./quality-guidelines.md) | 前端验证、禁用模式和评审检查 | 已归档 |
+| [类型安全](./type-safety.md) | 前端契约类型和边界类型规则 | 已归档 |
 
----
+## Pre-Development Checklist
 
-## 如何补充这些规范
+- 读取 `.trellis/spec/guides/product-scope.md`。
+- 读取 `component-guidelines.md`、`directory-structure.md`、`quality-guidelines.md`。
+- 如果改动命令、事件、数据形状或错误代码，读取 `docs/roles/contracts.md` 和 `.trellis/spec/guides/contract-and-integration.md`。
+- 如果改动样式或组件，读取 `component-guidelines.md`。
+- 如果改动 store、订阅或 snapshot 流，读取 `state-management.md`。
+- 如果改动 `web/src/types/contracts.ts` 或 `web/src/lib/tauriClient.ts`，读取 `type-safety.md` 和 `hook-guidelines.md`。
 
-对于每个规范文件：
+## Quality Check
 
-1. 记录您项目中的**实际约定**（而非理想方案）
-2. 包含来自您代码库的**代码示例**
-3. 列出**禁用的模式**及原因
-4. 补充您团队犯过的**常见错误**
-
-我们的目标是帮助 AI 助手 and 新团队成员了解“您的”项目是如何运作的。
-
----
-
-**语言**：所有文档都应使用**中文**编写。
+- 在可用时运行类型检查/构建 (typecheck/build)。
+- 验证 Mock 模式能否渲染仪表板状态。
+- 如果更改了样式或组件，请检查主题切换。
+- 检查桌面响应尺寸是否适应仪表板布局变化。

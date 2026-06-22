@@ -113,4 +113,8 @@ channel:
 packages:
   web:
     path: web
-default_package: @vpscope/web
+    type: frontend
+  src-tauri:
+    path: src-tauri
+    type: backend
+default_package: web

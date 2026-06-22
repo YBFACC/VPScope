@@ -33,7 +33,6 @@ MVP 明确不做破坏性远程操作，例如 kill、restart、delete、service
 - 多主机 Overview：按主机快速扫视健康状态、CPU/内存/磁盘占用、网络吞吐和连接状态。
 - 主机管理：保存长期 SSH profile、从 `~/.ssh/config` 导入 alias、连接测试、连接状态、错误态和部分数据失败状态。
 - 数据链路：通过 `/proc`、`df -P`、`ps` 等只读来源采集 Linux 指标。
-- SSH 认证：MVP 只支持 password-less OpenSSH 路径，复用 `~/.ssh/config` alias、`ssh-agent`、系统 Keychain 和可无交互使用的 key file。
 - 桌面体验：Tauri 应用壳、托盘常驻、设置页、通知能力、主题切换和 macOS 构建流程。
 - Mock 模式：前端可以脱离真实 Tauri/Rust 后端独立开发和预览。
 
@@ -48,7 +47,6 @@ MVP 明确不做破坏性远程操作，例如 kill、restart、delete、service
 - State: `Zustand`
 - Virtualized list: `@tanstack/react-virtual`
 - SSH: Rust 层通过 `openssh` 维护连接与采集
-- SSH auth: Rust 层通过系统 OpenSSH password-less 认证路径建立连接
 
 ## 目录结构
 

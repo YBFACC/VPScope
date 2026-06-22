@@ -1,19 +1,8 @@
 # VPScope 接口契约
 
-本文档定义前端 `/web` 与后端 `/src-tauri` 的通信契约。前端只依赖这些命令和事件，不依赖后端内部实现；后端只保证这些结构稳定，不关心前端具体布局。
+本文档只保留前端 `/web` 与后端 `/src-tauri` 的 API shape 参考。契约变更规则、跨边界约束和联调要求已归档到 `.trellis/spec/guides/contract-and-integration.md`。
 
-## 通信方式
-
-- 请求/响应：Tauri `invoke(command, payload)`。
-- 实时数据：Tauri event。
-- 错误返回：所有命令返回统一 `AppError`。
-- 时间字段：统一使用 Unix milliseconds。
-- 字节字段：统一使用 bytes。
-- 百分比字段：统一使用 `0` 到 `100` 的 number。
-
-## TypeScript 类型
-
-前端应在 `/web/src/types/contracts.ts` 中维护这些类型。后端 Rust 结构体应通过 `serde` 序列化出相同字段名。
+## TypeScript 类型参考
 
 ```ts
 export type HostId = string;
@@ -200,15 +189,6 @@ export type AlertSettings = {
 };
 ```
 
-`disks` 表示适合监控展示的文件系统挂载，不是 `df -P` 的原始全量输出。后端应过滤 `tmpfs`、`devtmpfs`、`efivarfs`、`proc`、`sysfs`、`cgroup*`、`overlay` 等虚拟或运行时文件系统，以及 `/proc`、`/sys`、`/run`、`/dev` 下的运行时挂载。
-
-`sampleState` 表示当前采样是否已有上一帧 counter：
-
-- `warming`: 当前 collector 还没有上一帧 counter。`cpu.totalPercent`、`cpu.cores[].percent`、`network[].rxBytesPerSec`、`network[].txBytesPerSec`、`disks[].readBytesPerSec`、`disks[].writeBytesPerSec` 不是有效 delta 值，前端不能把它们当作真实 `0` 写入历史或展示为真实 rate。
-- `live`: collector 已有上一帧 counter，CPU/network/disk IO delta 指标可展示并写入历史。
-
-`warming` 样本仍可携带 system、memory、disk capacity、network total counters 和 process 等非 delta 信息，用于避免首次采集时 UI 空白。
-
 ## Tauri Commands
 
 ### `host_list`
@@ -253,7 +233,7 @@ type HostSshConfigListResult = SshConfigHost[];
 
 ### `host_create`
 
-用途：新增 password-less SSH 服务器配置。MVP 只支持 `ssh_agent` 和可由系统 OpenSSH/ssh-agent 无交互使用的 `private_key`。
+用途：新增服务器配置。
 
 请求：
 
@@ -274,14 +254,9 @@ type HostCreatePayload = {
 type HostCreateResult = HostConfig;
 ```
 
-规则：
-
-- 后端不得接受 `password`、`passwordRef`、`passphrase`、`passphraseRef` 或 `keyRef` 字段；旧配置或请求携带这些字段时返回 `CONFIG_INVALID`。
-- VPScope 不保存、不读取密码或私钥口令；加密私钥的解锁必须由系统 OpenSSH、`ssh-agent` 或系统 Keychain 处理。
-
 ### `host_update`
 
-用途：更新 password-less SSH 服务器配置。
+用途：更新服务器配置。
 
 请求：
 
@@ -297,11 +272,6 @@ type HostUpdatePayload = {
 ```ts
 type HostUpdateResult = HostConfig;
 ```
-
-规则：
-
-- `patch.auth` 只能更新为 `ssh_agent` 或 `private_key`。
-- 后端不得接受 app-managed credential 字段；旧配置或请求携带这些字段时返回 `CONFIG_INVALID`。
 
 ### `host_reorder`
 
@@ -320,12 +290,6 @@ type HostReorderPayload = {
 ```ts
 type HostReorderResult = HostConfig[];
 ```
-
-规则：
-
-- `orderedHostIds` 必须包含当前所有 host id，且每个 id 只能出现一次。
-- 该命令只调整保存数组顺序，不修改单个 `HostConfig.updatedAt`。
-- 缺失或重复 id 返回 `CONFIG_INVALID`；未知 id 返回 `HOST_NOT_FOUND`。
 
 ### `host_delete`
 
@@ -349,7 +313,7 @@ type HostDeleteResult = {
 
 ### `host_open_terminal`
 
-用途：为已保存 host 打开一个本机 macOS 终端，并在终端中启动受控 SSH 会话。前端只传 `hostId`；后端从 `HostConfig` 读取用户名、地址、端口和可选 `keyPath` 生成 `ssh` 命令。该命令不读取、不传递、不打印密码、私钥内容或 passphrase，也不允许前端传入任意 shell 字符串。
+用途：为已保存 host 打开一个本机 macOS 终端。
 
 请求：
 
@@ -367,14 +331,6 @@ type HostOpenTerminalResult = {
   app: "terminal_app" | "iterm2" | "wezterm" | "ghostty" | "alacritty" | "kitty";
 };
 ```
-
-规则：
-
-- 只支持 `Terminal.app`、`iTerm2`、`WezTerm`、`Ghostty`、`Alacritty` 和 `kitty`。
-- `Terminal.app` 和 `iTerm2` 通过 AppleScript 打开并写入受控 `ssh` 命令；`WezTerm` 直接执行已安装的 `wezterm` binary，并使用 `start --new-tab -- ssh ...` 打开新 tab；其他终端通过 `/usr/bin/open -a <app> --args ...` 传递参数。
-- 密码、私钥口令和 agent 交互由系统 `ssh` 在外部终端中处理。
-- 这是本机受控启动动作，不是远程命令执行能力；不复用指标采集的 SSH mux session。
-- `hostId` 不存在返回 `HOST_NOT_FOUND`，host 用户名或地址为空返回 `CONFIG_INVALID`。
 
 ### `host_test_connection`
 
@@ -404,7 +360,7 @@ type HostTestConnectionResult = {
 
 ### `host_accept_key`
 
-用途：用户确认首次连接的 SSH host key 后，让系统 OpenSSH 将该 key 写入默认 `~/.ssh/known_hosts`。该命令只接受结构化 host payload 和用户确认过的 fingerprint，不允许前端传入任意 shell 字符串。
+用途：用户确认首次连接的 SSH host key。
 
 请求：
 
@@ -425,13 +381,6 @@ type HostAcceptKeyResult = {
 };
 ```
 
-规则：
-
-- 后端会重新扫描目标 host key，并确认扫描到的 fingerprint 与请求中的 `fingerprint` 完全一致。
-- fingerprint 不一致时返回 `SSH_HOST_KEY_CHANGED` 或 `CONFIG_INVALID`，且不得写入 known_hosts。
-- 写入动作由系统 OpenSSH 通过 `StrictHostKeyChecking=accept-new` 完成，VPScope 不拼接、不覆盖、不维护私有 known_hosts 文件。
-- `SSH_HOST_KEY_CHANGED` 只阻断连接，用户需要用系统 SSH 工具人工检查或清理 known_hosts。
-
 ### `metrics_subscribe`
 
 用途：开始订阅某个 host 的实时指标。后端通过 event 推送数据。
@@ -447,12 +396,6 @@ type MetricsSubscribePayload = {
   profile?: CollectionProfile;
 };
 ```
-
-`profile` 用于控制采集成本：
-
-- `active`：当前详情页，默认使用 host 的 `refreshIntervalMs`，限制在 500ms 到 10000ms，并按需采集进程列表。
-- `overview`：多 host 总览，限制在 5000ms 到 30000ms，不采集进程列表。
-- `tray`：窗口隐藏或菜单栏展示，限制在 30000ms 到 300000ms，不采集进程列表。
 
 响应：
 
@@ -573,14 +516,6 @@ type AlertSettings = {
 };
 ```
 
-规则：
-
-- `hostId` 必须指向现有 host。
-- 每个 `hostId + metric` 最多一条规则。
-- `thresholdPercent` 必须在 `1..100`。
-- `cooldownMs` 必须在 `60000..3600000`。
-- 删除 host 时后端会同步删除对应预警规则。
-
 ### `alert_settings_update`
 
 用途：更新 CPU 预警提醒配置。第一版只支持 CPU；触发逻辑由前端在接收 `HostSnapshot` 后评估，并通过 Tauri notification 插件发送 macOS 原生通知。
@@ -684,12 +619,6 @@ payload:
 HostSnapshot
 ```
 
-触发频率：
-
-- `active` 默认使用 host 的 `refreshIntervalMs`，限制在 500ms 到 10000ms。
-- `overview` 默认不低于 5000ms，限制在 5000ms 到 30000ms。
-- `tray` 默认 30000ms，限制在 30000ms 到 300000ms。
-
 ### `metrics://error`
 
 payload:
@@ -707,14 +636,3 @@ payload:
 - 单次采集失败。
 - parser 失败。
 - 远程命令不可用。
-
-## 错误展示约定
-
-前端根据 `AppError.code` 做稳定展示：
-
-- `SSH_AUTH_FAILED`: 显示“认证失败”，引导用户检查 ssh-agent、系统 SSH 配置或密钥文件是否可无交互认证。
-- `SSH_CONNECT_FAILED`: 显示“连接失败”，展示 address、port 和 retry。
-- `SSH_HOST_KEY_UNKNOWN`: 弹出 fingerprint 确认。
-- `SSH_HOST_KEY_CHANGED`: 强警告，需要用户重新确认，不自动连接。
-- `REMOTE_UNSUPPORTED`: 某些指标不可用，Dashboard 降级展示。
-- `PARSER_FAILED`: 展示“数据解析失败”，保留上一次有效 snapshot。

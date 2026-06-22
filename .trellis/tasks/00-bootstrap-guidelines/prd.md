@@ -21,8 +21,9 @@ the rest conversationally.
 
 ## Status (update the checkboxes as you complete each item)
 
-- [ ] Fill guidelines for @vpscope/web
-- [ ] Add code examples
+- [x] Fill guidelines for @vpscope/web
+- [x] Fill guidelines for src-tauri
+- [x] Add code examples
 
 ---
 
@@ -31,6 +32,15 @@ the rest conversationally.
 ### Package: @vpscope/web (`spec/web/`)
 
 - Frontend guidelines: `.trellis/spec/web/frontend/`
+
+### Package: src-tauri (`spec/src-tauri/`)
+
+- Backend guidelines: `.trellis/spec/src-tauri/backend/`
+
+### Shared contract and integration guides
+
+- Product scope guidelines: `.trellis/spec/guides/product-scope.md`
+- Contract and integration guidelines: `.trellis/spec/guides/contract-and-integration.md`
 
 
 ### Thinking guides (already populated)

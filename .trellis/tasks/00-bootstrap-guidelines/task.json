@@ -21,8 +21,11 @@
   "children": [],
   "parent": null,
   "relatedFiles": [
-    ".trellis/spec/web/"
+    ".trellis/spec/web/",
+    ".trellis/spec/src-tauri/",
+    ".trellis/spec/guides/product-scope.md",
+    ".trellis/spec/guides/contract-and-integration.md"
   ],
-  "notes": "First-time setup task created by trellis init (frontend project)",
+  "notes": "First-time setup task created by trellis init; guidelines bootstrapped from AGENTS.md, Style.md, docs/roles/, and existing web/src plus src-tauri/src code.",
   "meta": {}
 }
