@@ -1,0 +1,29 @@
+{
+  "id": "docker-management-actions",
+  "name": "docker-management-actions",
+  "title": "Docker management actions",
+  "description": "",
+  "status": "planning",
+  "dev_type": null,
+  "scope": null,
+  "package": "web",
+  "priority": "P2",
+  "creator": "ybf",
+  "assignee": "ybf",
+  "createdAt": "2026-07-01",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "07-01-docker-container-actions",
+    "07-01-docker-compose-rebuild-actions"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}
