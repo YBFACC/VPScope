@@ -115,3 +115,37 @@ Implemented first-stage Docker container management actions with fixed backend c
 ### Next Steps
 
 - None - task complete
+
+
+## Session 4: Add Docker compose rebuild actions
+
+**Date**: 2026-07-01
+**Task**: Add Docker compose rebuild actions
+**Package**: web
+**Branch**: `main`
+
+### Summary
+
+Added Docker Compose-aware controls for restart service, rebuild service, and rebuild project. Backend discovers Compose metadata from Docker labels, validates label-derived values, re-reads container metadata before execution, and runs fixed docker compose argument arrays. Updated contracts, TypeScript types, mocks, UI controls, docs, specs, and tests.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `6fafb92` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
