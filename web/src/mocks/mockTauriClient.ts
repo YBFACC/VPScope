@@ -4,6 +4,7 @@ import type { VPScopeClient } from "@/lib/tauriClient";
 import type {
   AlertSettings,
   DockerContainer,
+  DockerComposeActionPayload,
   DockerContainerActionPayload,
   DockerContainerLogsPayload,
   HostConfig,
@@ -44,6 +45,12 @@ let mockDockerContainers: DockerContainer[] = [
     image: "flux-logic-api:latest",
     state: "running",
     status: "Up 5 hours",
+    compose: {
+      project: "flux-logic",
+      service: "api",
+      workingDir: "/srv/flux-logic",
+      configFiles: ["/srv/flux-logic/compose.yml", "/srv/flux-logic/compose.prod.yml"],
+    },
   },
   {
     id: "fb2e571ebd80",
@@ -51,6 +58,12 @@ let mockDockerContainers: DockerContainer[] = [
     image: "flux-logic-web:latest",
     state: "running",
     status: "Up 5 hours",
+    compose: {
+      project: "flux-logic",
+      service: "web",
+      workingDir: "/srv/flux-logic",
+      configFiles: ["/srv/flux-logic/compose.yml", "/srv/flux-logic/compose.prod.yml"],
+    },
   },
   {
     id: "d51dbaf8b331",
@@ -58,6 +71,12 @@ let mockDockerContainers: DockerContainer[] = [
     image: "flux-logic-scheduler:latest",
     state: "running",
     status: "Up 4 hours",
+    compose: {
+      project: "flux-logic",
+      service: "scheduler",
+      workingDir: "/srv/flux-logic",
+      configFiles: ["/srv/flux-logic/compose.yml", "/srv/flux-logic/compose.prod.yml"],
+    },
   },
   {
     id: "7ba2c7b6dbad",
@@ -192,6 +211,37 @@ function updateMockDockerContainerAction(payload: DockerContainerActionPayload) 
         }
       : item,
   );
+}
+
+function updateMockDockerComposeAction(payload: DockerComposeActionPayload) {
+  const container = mockDockerContainers.find((item) => item.id === payload.containerId || item.name === payload.containerId);
+
+  if (!container?.compose) {
+    throw {
+      code: "CONFIG_INVALID",
+      message: "Docker container does not have Compose metadata",
+      retryable: false,
+    };
+  }
+
+  const targetCompose = container.compose;
+  const serviceNames =
+    payload.action === "rebuildProject"
+      ? new Set(mockDockerContainers.filter((item) => item.compose?.project === targetCompose.project).map((item) => item.compose?.service))
+      : new Set([targetCompose.service]);
+
+  mockDockerContainers = mockDockerContainers.map((item) => {
+    const compose = item.compose;
+    if (compose?.project !== targetCompose.project || !serviceNames.has(compose.service)) {
+      return item;
+    }
+
+    return {
+      ...item,
+      state: "running",
+      status: payload.action === "restartService" ? "Up less than a second" : "Up after rebuild",
+    };
+  });
 }
 
 function createSubscriptionSnapshot(hostId: HostId, profile = "active") {
@@ -409,6 +459,19 @@ export function createMockTauriClient(): VPScopeClient {
         hostId: payload.hostId,
         containerId: payload.containerId,
         action: payload.action,
+        completedAt: Date.now(),
+      };
+    },
+    async runDockerComposeAction(payload) {
+      await wait(420);
+      updateMockDockerComposeAction(payload);
+      const container = mockDockerContainers.find((item) => item.id === payload.containerId || item.name === payload.containerId);
+      return {
+        hostId: payload.hostId,
+        containerId: payload.containerId,
+        action: payload.action,
+        project: container?.compose?.project ?? "unknown",
+        service: payload.action === "rebuildProject" ? undefined : container?.compose?.service,
         completedAt: Date.now(),
       };
     },

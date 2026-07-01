@@ -231,12 +231,20 @@ export type ProcessInfo = {
 
 export type DockerLogTailLines = 100 | 300 | 1000;
 
+export type DockerComposeMetadata = {
+  project: string;
+  service: string;
+  workingDir: string;
+  configFiles: string[];
+};
+
 export type DockerContainer = {
   id: string;
   name: string;
   image: string;
   state: string;
   status: string;
+  compose?: DockerComposeMetadata;
 };
 
 export type DockerContainerListPayload = {
@@ -271,6 +279,23 @@ export type DockerContainerActionResult = {
   hostId: HostId;
   containerId: string;
   action: DockerContainerAction;
+  completedAt: number;
+};
+
+export type DockerComposeAction = "restartService" | "rebuildService" | "rebuildProject";
+
+export type DockerComposeActionPayload = {
+  hostId: HostId;
+  containerId: string;
+  action: DockerComposeAction;
+};
+
+export type DockerComposeActionResult = {
+  hostId: HostId;
+  containerId: string;
+  action: DockerComposeAction;
+  project: string;
+  service?: string;
   completedAt: number;
 };
 
@@ -349,6 +374,7 @@ export type VpscopeCommandPayloads = {
   docker_container_list: DockerContainerListPayload;
   docker_container_logs: DockerContainerLogsPayload;
   docker_container_action: DockerContainerActionPayload;
+  docker_compose_action: DockerComposeActionPayload;
   tray_settings_get: Record<string, never>;
   tray_settings_update: TraySettingsUpdatePayload;
   alert_settings_get: Record<string, never>;
@@ -374,6 +400,7 @@ export type VpscopeCommandResults = {
   docker_container_list: DockerContainerListResult;
   docker_container_logs: DockerContainerLogsResult;
   docker_container_action: DockerContainerActionResult;
+  docker_compose_action: DockerComposeActionResult;
   tray_settings_get: TraySettings;
   tray_settings_update: TraySettings;
   alert_settings_get: AlertSettings;

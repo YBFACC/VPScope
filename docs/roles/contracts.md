@@ -631,6 +631,12 @@ type DockerContainerListResult = Array<{
   image: string;
   state: string;
   status: string;
+  compose?: {
+    project: string;
+    service: string;
+    workingDir: string;
+    configFiles: string[];
+  };
 }>;
 ```
 
@@ -696,6 +702,50 @@ type DockerContainerActionResult = {
 - `forceRemove`: `docker rm -f <container>`
 
 `forceRemove` 仅用于用户确认删除 running 容器后的固定动作路径。
+
+### `docker_compose_action`
+
+用途：对某个 Docker Compose service/project 执行固定白名单动作。后端会根据 `containerId` 重新读取并验证 Docker Compose labels；前端不能传入 Compose path、service、flags 或 shell 字符串。
+
+请求：
+
+```ts
+type DockerComposeAction = "restartService" | "rebuildService" | "rebuildProject";
+
+type DockerComposeActionPayload = {
+  hostId: HostId;
+  containerId: string;
+  action: DockerComposeAction;
+};
+```
+
+响应：
+
+```ts
+type DockerComposeActionResult = {
+  hostId: HostId;
+  containerId: string;
+  action: DockerComposeAction;
+  project: string;
+  service?: string;
+  completedAt: number;
+};
+```
+
+动作映射：
+
+- `restartService`: `docker compose --project-directory <workingDir> -f <configFile>... -p <project> restart <service>`
+- `rebuildService`: `docker compose --project-directory <workingDir> -f <configFile>... -p <project> up -d --build <service>`
+- `rebuildProject`: `docker compose --project-directory <workingDir> -f <configFile>... -p <project> up -d --build`
+
+Compose metadata 来自 Docker labels：
+
+- `com.docker.compose.project`
+- `com.docker.compose.service`
+- `com.docker.compose.project.working_dir`
+- `com.docker.compose.project.config_files`
+
+缺少或不安全的 metadata 不会授权 Compose 动作；`docker_compose_action` 返回 `CONFIG_INVALID`。
 
 ## Events
 

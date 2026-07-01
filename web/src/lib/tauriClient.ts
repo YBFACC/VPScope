@@ -10,6 +10,8 @@ import { createMockTauriClient } from "@/mocks/mockTauriClient";
 import type {
   AlertSettings,
   AppError,
+  DockerComposeActionPayload,
+  DockerComposeActionResult,
   DockerContainerActionPayload,
   DockerContainerActionResult,
   DockerContainer,
@@ -65,6 +67,7 @@ export type VPScopeClient = {
   listDockerContainers(hostId: HostId): Promise<DockerContainer[]>;
   getDockerContainerLogs(payload: DockerContainerLogsPayload): Promise<DockerContainerLogsResult>;
   runDockerContainerAction(payload: DockerContainerActionPayload): Promise<DockerContainerActionResult>;
+  runDockerComposeAction(payload: DockerComposeActionPayload): Promise<DockerComposeActionResult>;
   getTraySettings(): Promise<TraySettings>;
   updateTraySettings(settings: TraySettings): Promise<TraySettings>;
   getAlertSettings(): Promise<AlertSettings>;
@@ -168,6 +171,9 @@ function createTauriClient(): VPScopeClient {
     },
     async runDockerContainerAction(payload) {
       return invokeCommand("docker_container_action", payload);
+    },
+    async runDockerComposeAction(payload) {
+      return invokeCommand("docker_compose_action", payload);
     },
     async getTraySettings() {
       return invoke<TraySettings>("tray_settings_get", {});

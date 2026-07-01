@@ -638,9 +638,39 @@ select:disabled {
   gap: 0.25rem;
 }
 
+.docker-compose-actions {
+  display: flex;
+  grid-column: 1 / -1;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.docker-compose-chip {
+  max-width: 20rem;
+  min-height: 1.875rem;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  background: var(--color-input);
+  padding: 0.45rem 0.5rem 0;
+  color: var(--color-accent);
+  font-size: 10px;
+  line-height: 1;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
 .docker-action-button {
   width: 4.25rem;
   min-width: 4.25rem;
+  padding: 0;
+}
+
+.docker-compose-button {
+  width: 7rem;
+  min-width: 7rem;
   padding: 0;
 }
 
@@ -689,6 +719,11 @@ select:disabled {
   width: 4.25rem;
   min-width: 4.25rem;
   padding: 0;
+}
+
+.docker-compose-confirm-button {
+  width: 7rem;
+  min-width: 7rem;
 }
 
 .docker-log-search {

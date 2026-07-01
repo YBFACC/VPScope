@@ -11,11 +11,12 @@ pub mod tray;
 pub fn run() {
     use app_state::AppState;
     use commands::{
-        alert_settings_get, alert_settings_update, docker_container_action, docker_container_list,
-        docker_container_logs, health_check, host_accept_key, host_create, host_delete, host_list,
-        host_open_terminal, host_reorder, host_ssh_config_list, host_test_connection, host_update,
-        metrics_last_snapshot, metrics_subscribe, metrics_unsubscribe, process_list,
-        terminal_settings_get, terminal_settings_update, tray_settings_get, tray_settings_update,
+        alert_settings_get, alert_settings_update, docker_compose_action, docker_container_action,
+        docker_container_list, docker_container_logs, health_check, host_accept_key, host_create,
+        host_delete, host_list, host_open_terminal, host_reorder, host_ssh_config_list,
+        host_test_connection, host_update, metrics_last_snapshot, metrics_subscribe,
+        metrics_unsubscribe, process_list, terminal_settings_get, terminal_settings_update,
+        tray_settings_get, tray_settings_update,
     };
     use tauri::{Manager, WindowEvent};
     use tray::setup_tray;
@@ -52,6 +53,7 @@ pub fn run() {
             docker_container_list,
             docker_container_logs,
             docker_container_action,
+            docker_compose_action,
             metrics_last_snapshot,
             metrics_subscribe,
             metrics_unsubscribe,

@@ -204,6 +204,78 @@ docker_container_action(host_id: String, container_id: String, action: DockerCon
 - Command mapping test: `forceRemove` renders fixed `docker rm -f <container>`.
 - Contract check: docs, TypeScript types, Rust serde structs, mocks, and command registration are updated together.
 
+## Scenario: Docker Compose 管理命令
+
+### 1. Scope / Trigger
+
+- Trigger: Docker 面板扩展为 Compose-aware 工作区。
+- Scope: 允许基于 Docker Compose labels 的 `restartService`、`rebuildService`、`rebuildProject`。
+- Safety: Compose 命令必须由后端固定枚举和 label-derived metadata 构造；前端不能传 Compose path、service、flags 或 shell 字符串。
+- Out of scope: 编辑 compose 文件、任意 profiles/env files/flags、`down`、volume 删除、image prune、network 删除、数据库 reset。
+
+### 2. Signatures
+
+```rust
+docker_compose_action(host_id: String, container_id: String, action: DockerComposeAction) -> Result<DockerComposeActionResult, AppError>
+```
+
+### 3. Contracts
+
+- `docker_container_list` response item may include `compose?: { project, service, workingDir, configFiles }`.
+- `docker_compose_action` request: `hostId`, `containerId`, `action: "restartService" | "rebuildService" | "rebuildProject"`
+- `docker_compose_action` response: `hostId`, `containerId`, `action`, `project`, optional `service`, `completedAt` (Unix milliseconds)
+- Compose metadata comes only from Docker labels:
+  - `com.docker.compose.project`
+  - `com.docker.compose.service`
+  - `com.docker.compose.project.working_dir`
+  - `com.docker.compose.project.config_files`
+
+### 4. Validation & Error Matrix
+
+- Missing host -> `HOST_NOT_FOUND`
+- Empty / unsafe `containerId` -> `CONFIG_INVALID`
+- Missing or incomplete Compose labels -> `CONFIG_INVALID` for `docker_compose_action`
+- Unsafe project/service identifier -> `CONFIG_INVALID`
+- Non-absolute or control-character-containing working/config path -> `CONFIG_INVALID`
+- Missing Docker / Compose support on remote -> `REMOTE_UNSUPPORTED` or `REMOTE_COMMAND_FAILED` depending on CLI error shape
+- Docker permission denied or command failure -> `REMOTE_COMMAND_FAILED`
+- SSH authentication / connection / host-key failures -> existing SSH error mapping
+- `docker_container_list` parser must preserve trailing empty label columns from Docker format output; incomplete Compose labels are omitted from list metadata so the UI hides Compose controls, while `docker_compose_action` still returns `CONFIG_INVALID`.
+
+### 5. Good/Base/Bad Cases
+
+- Good: selected Compose service with safe labels can run `rebuildService` through fixed args.
+- Base: non-Compose containers are still listed, but `compose` is omitted and UI hides Compose controls.
+- Bad: frontend cannot provide a custom `-f`, `--profile`, `down`, `exec`, or shell fragment.
+
+### 6. Tests Required
+
+- Parser test: Compose labels produce optional metadata.
+- Parser test: non-Compose rows keep `compose` omitted.
+- Validation test: unsafe service names and non-absolute paths are rejected.
+- Command mapping test: service rebuild and project rebuild render fixed command strings.
+- Contract check: docs, TypeScript types, Rust serde structs, mocks, and command registration are updated together.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```rust
+ssh.exec(host_id, RemoteCommand::Raw(payload.compose_command));
+```
+
+#### Correct
+
+```rust
+ssh.exec(host, RemoteCommand::DockerComposeAction {
+    project,
+    working_dir,
+    config_files,
+    service,
+    action,
+});
+```
+
 ## known_hosts 校验
 
 需要处理三种状态：

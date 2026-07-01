@@ -6,6 +6,7 @@ import { formatDateTime } from "@/lib/format";
 import { runClient, tauriClient } from "@/lib/tauriClient";
 import type {
   AppError,
+  DockerComposeAction,
   DockerContainer,
   DockerContainerAction,
   DockerContainerLogsResult,
@@ -35,7 +36,9 @@ export function DockerLogsWorkspace({ host, onClose }: DockerLogsWorkspaceProps)
   const [isLoadingContainers, setIsLoadingContainers] = useState(false);
   const [isLoadingLogs, setIsLoadingLogs] = useState(false);
   const [pendingAction, setPendingAction] = useState<DockerContainerAction>();
+  const [pendingComposeAction, setPendingComposeAction] = useState<DockerComposeAction>();
   const [confirmRemoveContainer, setConfirmRemoveContainer] = useState<DockerContainer>();
+  const [confirmComposeProjectAction, setConfirmComposeProjectAction] = useState<DockerComposeAction>();
   const [containerError, setContainerError] = useState<AppError>();
   const [logsError, setLogsError] = useState<AppError>();
   const [actionError, setActionError] = useState<AppError>();
@@ -189,8 +192,32 @@ export function DockerLogsWorkspace({ host, onClose }: DockerLogsWorkspaceProps)
     await runContainerAction(isContainerRunning(confirmRemoveContainer) ? "forceRemove" : "remove", confirmRemoveContainer);
   }
 
+  async function runComposeAction(action: DockerComposeAction, container = selectedContainer) {
+    if (!container?.compose) {
+      return;
+    }
+
+    setPendingComposeAction(action);
+    setActionError(undefined);
+    try {
+      await runClient(() =>
+        tauriClient.runDockerComposeAction({
+          hostId: host.id,
+          containerId: container.id,
+          action,
+        }),
+      );
+      setConfirmComposeProjectAction(undefined);
+      await loadContainers();
+    } catch (error) {
+      setActionError(error as AppError);
+    } finally {
+      setPendingComposeAction(undefined);
+    }
+  }
+
   const logLineCount = visibleLogLines.length;
-  const actionsDisabled = Boolean(pendingAction) || isLoadingContainers;
+  const actionsDisabled = Boolean(pendingAction) || Boolean(pendingComposeAction) || isLoadingContainers;
 
   return (
     <div className="docker-workspace-overlay">
@@ -345,6 +372,37 @@ export function DockerLogsWorkspace({ host, onClose }: DockerLogsWorkspaceProps)
                 placeholder={t("searchLogs")}
                 aria-label={t("searchLogs")}
               />
+              {selectedContainer?.compose ? (
+                <div className="docker-compose-actions" aria-label={t("compose")}>
+                  <span className="docker-compose-chip">
+                    {t("compose")} {selectedContainer.compose.project}/{selectedContainer.compose.service}
+                  </span>
+                  <button
+                    type="button"
+                    className="control-button docker-compose-button"
+                    onClick={() => void runComposeAction("restartService")}
+                    disabled={actionsDisabled}
+                  >
+                    {pendingComposeAction === "restartService" ? t("requesting") : t("restartService")}
+                  </button>
+                  <button
+                    type="button"
+                    className="control-button docker-compose-button"
+                    onClick={() => void runComposeAction("rebuildService")}
+                    disabled={actionsDisabled}
+                  >
+                    {pendingComposeAction === "rebuildService" ? t("requesting") : t("rebuildService")}
+                  </button>
+                  <button
+                    type="button"
+                    className="control-button docker-compose-button docker-action-button-danger"
+                    onClick={() => setConfirmComposeProjectAction("rebuildProject")}
+                    disabled={actionsDisabled}
+                  >
+                    {pendingComposeAction === "rebuildProject" ? t("requesting") : t("rebuildProject")}
+                  </button>
+                </div>
+              ) : null}
               {confirmRemoveContainer ? (
                 <div className="docker-action-confirm" data-danger={isContainerRunning(confirmRemoveContainer)}>
                   <span>
@@ -367,6 +425,31 @@ export function DockerLogsWorkspace({ host, onClose }: DockerLogsWorkspaceProps)
                     disabled={Boolean(pendingAction)}
                   >
                     {pendingAction === "remove" || pendingAction === "forceRemove" ? t("requesting") : t("delete")}
+                  </button>
+                </div>
+              ) : null}
+              {confirmComposeProjectAction && selectedContainer?.compose ? (
+                <div className="docker-action-confirm" data-danger="true">
+                  <span>
+                    {t("confirmRebuildComposeProject", {
+                      name: selectedContainer.compose.project,
+                    })}
+                  </span>
+                  <button
+                    type="button"
+                    className="control-button docker-action-confirm-button"
+                    onClick={() => setConfirmComposeProjectAction(undefined)}
+                    disabled={Boolean(pendingComposeAction)}
+                  >
+                    {t("cancel")}
+                  </button>
+                  <button
+                    type="button"
+                    className="control-button docker-action-confirm-button docker-compose-confirm-button docker-action-button-danger"
+                    onClick={() => void runComposeAction(confirmComposeProjectAction)}
+                    disabled={Boolean(pendingComposeAction)}
+                  >
+                    {pendingComposeAction === "rebuildProject" ? t("requesting") : t("rebuildProject")}
                   </button>
                 </div>
               ) : null}

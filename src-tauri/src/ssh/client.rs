@@ -37,6 +37,14 @@ pub enum DockerContainerAction {
     ForceRemove,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum DockerComposeAction {
+    RestartService,
+    RebuildService,
+    RebuildProject,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RemoteCommand {
     ProcStat,
@@ -57,6 +65,13 @@ pub enum RemoteCommand {
         container_id: String,
         action: DockerContainerAction,
     },
+    DockerComposeAction {
+        project: String,
+        working_dir: String,
+        config_files: Vec<String>,
+        service: Option<String>,
+        action: DockerComposeAction,
+    },
 }
 
 impl RemoteCommand {
@@ -72,8 +87,7 @@ impl RemoteCommand {
             Self::Ps => "ps -eo pid,ppid,user,stat,pcpu,pmem,rss,args".to_string(),
             Self::Uname => "uname -a".to_string(),
             Self::DockerContainerList => {
-                "docker ps -a --format {{.ID}}\\t{{.Names}}\\t{{.Image}}\\t{{.State}}\\t{{.Status}}"
-                    .to_string()
+                "docker ps -a --format {{.ID}}\\t{{.Names}}\\t{{.Image}}\\t{{.State}}\\t{{.Status}}\\t{{.Label \"com.docker.compose.project\"}}\\t{{.Label \"com.docker.compose.service\"}}\\t{{.Label \"com.docker.compose.project.working_dir\"}}\\t{{.Label \"com.docker.compose.project.config_files\"}}".to_string()
             }
             Self::DockerContainerLogs {
                 container_id,
@@ -91,8 +105,57 @@ impl RemoteCommand {
                 DockerContainerAction::Remove => format!("docker rm {container_id}"),
                 DockerContainerAction::ForceRemove => format!("docker rm -f {container_id}"),
             },
+            Self::DockerComposeAction {
+                project,
+                working_dir,
+                config_files,
+                service,
+                action,
+            } => format!("docker {}", compose_args(project, working_dir, config_files, service, *action).join(" ")),
         }
     }
+}
+
+fn compose_args(
+    project: &str,
+    working_dir: &str,
+    config_files: &[String],
+    service: &Option<String>,
+    action: DockerComposeAction,
+) -> Vec<String> {
+    let mut args = vec![
+        "compose".to_string(),
+        "--project-directory".to_string(),
+        working_dir.to_string(),
+    ];
+
+    for config_file in config_files {
+        args.push("-f".to_string());
+        args.push(config_file.to_string());
+    }
+
+    args.push("-p".to_string());
+    args.push(project.to_string());
+
+    match action {
+        DockerComposeAction::RestartService => {
+            args.push("restart".to_string());
+            if let Some(service) = service {
+                args.push(service.to_string());
+            }
+        }
+        DockerComposeAction::RebuildService => {
+            args.extend(["up".to_string(), "-d".to_string(), "--build".to_string()]);
+            if let Some(service) = service {
+                args.push(service.to_string());
+            }
+        }
+        DockerComposeAction::RebuildProject => {
+            args.extend(["up".to_string(), "-d".to_string(), "--build".to_string()]);
+        }
+    }
+
+    args
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -476,7 +539,7 @@ impl OpenSshClient {
                         "ps",
                         "-a",
                         "--format",
-                        "{{.ID}}\t{{.Names}}\t{{.Image}}\t{{.State}}\t{{.Status}}",
+                        "{{.ID}}\t{{.Names}}\t{{.Image}}\t{{.State}}\t{{.Status}}\t{{.Label \"com.docker.compose.project\"}}\t{{.Label \"com.docker.compose.service\"}}\t{{.Label \"com.docker.compose.project.working_dir\"}}\t{{.Label \"com.docker.compose.project.config_files\"}}",
                     ],
                 )
                 .await
@@ -514,6 +577,17 @@ impl OpenSshClient {
                         .await
                 }
             },
+            RemoteCommand::DockerComposeAction {
+                project,
+                working_dir,
+                config_files,
+                service,
+                action,
+            } => {
+                let args = compose_args(project, working_dir, config_files, service, *action);
+                let arg_refs: Vec<&str> = args.iter().map(String::as_str).collect();
+                Self::exec_program(session, "docker", &arg_refs).await
+            }
         }
     }
 
