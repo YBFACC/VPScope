@@ -259,6 +259,21 @@ export type DockerContainerLogsResult = {
   fetchedAt: number;
 };
 
+export type DockerContainerAction = "start" | "stop" | "restart" | "remove" | "forceRemove";
+
+export type DockerContainerActionPayload = {
+  hostId: HostId;
+  containerId: string;
+  action: DockerContainerAction;
+};
+
+export type DockerContainerActionResult = {
+  hostId: HostId;
+  containerId: string;
+  action: DockerContainerAction;
+  completedAt: number;
+};
+
 export type SampleState = "warming" | "live";
 
 export type HostSnapshot = {
@@ -333,6 +348,7 @@ export type VpscopeCommandPayloads = {
   process_list: ProcessListPayload;
   docker_container_list: DockerContainerListPayload;
   docker_container_logs: DockerContainerLogsPayload;
+  docker_container_action: DockerContainerActionPayload;
   tray_settings_get: Record<string, never>;
   tray_settings_update: TraySettingsUpdatePayload;
   alert_settings_get: Record<string, never>;
@@ -357,6 +373,7 @@ export type VpscopeCommandResults = {
   process_list: ProcessListResult;
   docker_container_list: DockerContainerListResult;
   docker_container_logs: DockerContainerLogsResult;
+  docker_container_action: DockerContainerActionResult;
   tray_settings_get: TraySettings;
   tray_settings_update: TraySettings;
   alert_settings_get: AlertSettings;

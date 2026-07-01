@@ -7,6 +7,7 @@ import { runClient, tauriClient } from "@/lib/tauriClient";
 import type {
   AppError,
   DockerContainer,
+  DockerContainerAction,
   DockerContainerLogsResult,
   DockerLogTailLines,
   HostConfig,
@@ -33,9 +34,13 @@ export function DockerLogsWorkspace({ host, onClose }: DockerLogsWorkspaceProps)
   const [search, setSearch] = useState("");
   const [isLoadingContainers, setIsLoadingContainers] = useState(false);
   const [isLoadingLogs, setIsLoadingLogs] = useState(false);
+  const [pendingAction, setPendingAction] = useState<DockerContainerAction>();
+  const [confirmRemoveContainer, setConfirmRemoveContainer] = useState<DockerContainer>();
   const [containerError, setContainerError] = useState<AppError>();
   const [logsError, setLogsError] = useState<AppError>();
+  const [actionError, setActionError] = useState<AppError>();
   const selectedContainer = containers.find((container) => container.id === selectedContainerId);
+  const selectedContainerIsRunning = isContainerRunning(selectedContainer);
 
   const searchNeedle = search.trim();
   const visibleLogLines = useMemo(() => {
@@ -152,7 +157,40 @@ export function DockerLogsWorkspace({ host, onClose }: DockerLogsWorkspaceProps)
     }
   }
 
+  async function runContainerAction(action: DockerContainerAction, container = selectedContainer) {
+    if (!container) {
+      return;
+    }
+
+    setPendingAction(action);
+    setActionError(undefined);
+    try {
+      await runClient(() =>
+        tauriClient.runDockerContainerAction({
+          hostId: host.id,
+          containerId: container.id,
+          action,
+        }),
+      );
+      setConfirmRemoveContainer(undefined);
+      await loadContainers();
+    } catch (error) {
+      setActionError(error as AppError);
+    } finally {
+      setPendingAction(undefined);
+    }
+  }
+
+  async function confirmRemove() {
+    if (!confirmRemoveContainer) {
+      return;
+    }
+
+    await runContainerAction(isContainerRunning(confirmRemoveContainer) ? "forceRemove" : "remove", confirmRemoveContainer);
+  }
+
   const logLineCount = visibleLogLines.length;
+  const actionsDisabled = Boolean(pendingAction) || isLoadingContainers;
 
   return (
     <div className="docker-workspace-overlay">
@@ -259,6 +297,47 @@ export function DockerLogsWorkspace({ host, onClose }: DockerLogsWorkspaceProps)
                   {logsResult ? `${t("last")} ${tailLines} · ${formatDateTime(logsResult.fetchedAt)}` : selectedContainer?.status}
                 </div>
               </div>
+              <div className="docker-container-actions" aria-label={t("containers")}>
+                {selectedContainer ? (
+                  selectedContainerIsRunning ? (
+                    <>
+                      <button
+                        type="button"
+                        className="control-button docker-action-button"
+                        onClick={() => void runContainerAction("stop")}
+                        disabled={actionsDisabled}
+                      >
+                        {pendingAction === "stop" ? t("requesting") : t("stopContainer")}
+                      </button>
+                      <button
+                        type="button"
+                        className="control-button docker-action-button"
+                        onClick={() => void runContainerAction("restart")}
+                        disabled={actionsDisabled}
+                      >
+                        {pendingAction === "restart" ? t("requesting") : t("restartContainer")}
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      className="control-button docker-action-button"
+                      onClick={() => void runContainerAction("start")}
+                      disabled={actionsDisabled}
+                    >
+                      {pendingAction === "start" ? t("requesting") : t("startContainer")}
+                    </button>
+                  )
+                ) : null}
+                <button
+                  type="button"
+                  className="control-button docker-action-button docker-action-button-danger"
+                  onClick={() => selectedContainer && setConfirmRemoveContainer(selectedContainer)}
+                  disabled={!selectedContainer || actionsDisabled}
+                >
+                  {pendingAction === "remove" || pendingAction === "forceRemove" ? t("requesting") : t("removeContainer")}
+                </button>
+              </div>
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
@@ -266,6 +345,37 @@ export function DockerLogsWorkspace({ host, onClose }: DockerLogsWorkspaceProps)
                 placeholder={t("searchLogs")}
                 aria-label={t("searchLogs")}
               />
+              {confirmRemoveContainer ? (
+                <div className="docker-action-confirm" data-danger={isContainerRunning(confirmRemoveContainer)}>
+                  <span>
+                    {t(isContainerRunning(confirmRemoveContainer) ? "confirmForceRemoveContainer" : "confirmRemoveContainer", {
+                      name: confirmRemoveContainer.name,
+                    })}
+                  </span>
+                  <button
+                    type="button"
+                    className="control-button docker-action-confirm-button"
+                    onClick={() => setConfirmRemoveContainer(undefined)}
+                    disabled={Boolean(pendingAction)}
+                  >
+                    {t("cancel")}
+                  </button>
+                  <button
+                    type="button"
+                    className="control-button docker-action-confirm-button docker-action-button-danger"
+                    onClick={() => void confirmRemove()}
+                    disabled={Boolean(pendingAction)}
+                  >
+                    {pendingAction === "remove" || pendingAction === "forceRemove" ? t("requesting") : t("delete")}
+                  </button>
+                </div>
+              ) : null}
+              {actionError ? (
+                <div className="docker-action-error">
+                  <strong>{actionError.code}</strong>
+                  <span>{actionError.message}</span>
+                </div>
+              ) : null}
             </div>
 
             {logsError ? (
@@ -293,6 +403,10 @@ export function DockerLogsWorkspace({ host, onClose }: DockerLogsWorkspaceProps)
       </section>
     </div>
   );
+}
+
+function isContainerRunning(container?: DockerContainer) {
+  return container?.state.toLowerCase() === "running";
 }
 
 function LogLine({ line, needle, isLast }: { line: string; needle: string; isLast: boolean }) {

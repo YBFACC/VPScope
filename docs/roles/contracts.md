@@ -660,6 +660,43 @@ type DockerContainerLogsResult = {
 };
 ```
 
+### `docker_container_action`
+
+用途：对某个 Docker 容器执行固定白名单管理动作。该命令只允许后端定义的动作枚举，不允许前端传入任意 Docker 子命令、flags 或 shell 字符串。
+
+请求：
+
+```ts
+type DockerContainerAction = "start" | "stop" | "restart" | "remove" | "forceRemove";
+
+type DockerContainerActionPayload = {
+  hostId: HostId;
+  containerId: string;
+  action: DockerContainerAction;
+};
+```
+
+响应：
+
+```ts
+type DockerContainerActionResult = {
+  hostId: HostId;
+  containerId: string;
+  action: DockerContainerAction;
+  completedAt: number;
+};
+```
+
+动作映射：
+
+- `start`: `docker start <container>`
+- `stop`: `docker stop <container>`
+- `restart`: `docker restart <container>`
+- `remove`: `docker rm <container>`
+- `forceRemove`: `docker rm -f <container>`
+
+`forceRemove` 仅用于用户确认删除 running 容器后的固定动作路径。
+
 ## Events
 
 ### `host://connection-state`

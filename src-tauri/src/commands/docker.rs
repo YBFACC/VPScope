@@ -1,7 +1,7 @@
 use crate::{
     app_state::AppState,
     errors::{AppError, AppErrorCode},
-    ssh::RemoteCommand,
+    ssh::{DockerContainerAction, RemoteCommand},
 };
 use serde::Serialize;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -27,6 +27,15 @@ pub struct DockerContainerLogsResult {
     pub tail_lines: u16,
     pub logs: String,
     pub fetched_at: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DockerContainerActionResult {
+    pub host_id: String,
+    pub container_id: String,
+    pub action: DockerContainerAction,
+    pub completed_at: u64,
 }
 
 #[tauri::command(rename_all = "camelCase")]
@@ -74,6 +83,36 @@ pub async fn docker_container_logs(
         tail_lines,
         logs,
         fetched_at: unix_ms(),
+    })
+}
+
+#[tauri::command(rename_all = "camelCase")]
+pub async fn docker_container_action(
+    host_id: String,
+    container_id: String,
+    action: DockerContainerAction,
+    state: State<'_, AppState>,
+) -> Result<DockerContainerActionResult, AppError> {
+    let host = state.config_store.get_host(&host_id)?;
+    let container_id = normalize_container_identifier(&container_id)?;
+    state
+        .ssh_pool
+        .client()
+        .exec(
+            &host,
+            RemoteCommand::DockerContainerAction {
+                container_id: container_id.clone(),
+                action,
+            },
+        )
+        .await
+        .map_err(map_docker_error)?;
+
+    Ok(DockerContainerActionResult {
+        host_id,
+        container_id,
+        action,
+        completed_at: unix_ms(),
     })
 }
 
@@ -213,5 +252,23 @@ fb2e571ebd80\tflux-logic-web\tflux-logic-web:latest\trunning\tUp 5 hours
             let error = normalize_container_identifier(value).expect_err("invalid id");
             assert_eq!(error.code, AppErrorCode::ConfigInvalid.as_str());
         }
+    }
+
+    #[test]
+    fn serializes_force_remove_action() {
+        let value =
+            serde_json::to_value(DockerContainerAction::ForceRemove).expect("serialize action");
+
+        assert_eq!(value, serde_json::json!("forceRemove"));
+    }
+
+    #[test]
+    fn renders_fixed_force_remove_command() {
+        let command = RemoteCommand::DockerContainerAction {
+            container_id: "flux-logic-api".to_string(),
+            action: DockerContainerAction::ForceRemove,
+        };
+
+        assert_eq!(command.as_fixed_command(), "docker rm -f flux-logic-api");
     }
 }

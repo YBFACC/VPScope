@@ -98,7 +98,7 @@ pub enum RemoteCommand {
 ### 1. Scope / Trigger
 
 - Trigger: Docker 日志查看器新增跨层 command，并通过 SSH 执行远程 Docker CLI。
-- Scope: 只允许列容器和读取 bounded tail logs；不允许 stop/start/restart/delete/exec/follow。
+- Scope: 列容器和读取 bounded tail logs；日志命令本身不允许 stop/start/restart/delete/exec/follow。
 - Safety: Docker 命令必须由后端固定构造，前端不能传入 shell 字符串或任意 Docker 子命令。
 
 ### 2. Signatures
@@ -159,6 +159,50 @@ ssh.exec(host_id, RemoteCommand::DockerLogs { container_id, tail_lines });
 
 - 前端无法让后端执行任意 shell。
 - SSH 连接失败能区分认证失败、网络失败、host key 问题。
+
+## Scenario: Docker 容器管理命令
+
+### 1. Scope / Trigger
+
+- Trigger: Docker 面板明确扩展为轻量管理工作区。
+- Scope: 允许单容器 `start`、`stop`、`restart`、`remove`、`forceRemove`。
+- Safety: 管理动作必须是后端固定枚举；前端不能传 Docker 子命令、flags 或 shell 字符串。
+- Out of scope: `exec`、任意 flags、image/volume/network 管理、Compose 操作。
+
+### 2. Signatures
+
+```rust
+docker_container_action(host_id: String, container_id: String, action: DockerContainerAction) -> Result<DockerContainerActionResult, AppError>
+```
+
+### 3. Contracts
+
+- request: `hostId`, `containerId`, `action: "start" | "stop" | "restart" | "remove" | "forceRemove"`
+- response: `hostId`, `containerId`, `action`, `completedAt` (Unix milliseconds)
+- `containerId` must be validated before command construction.
+
+### 4. Fixed Command Mapping
+
+- `start` -> `docker start <container>`
+- `stop` -> `docker stop <container>`
+- `restart` -> `docker restart <container>`
+- `remove` -> `docker rm <container>`
+- `forceRemove` -> `docker rm -f <container>`
+
+### 5. Validation & Error Matrix
+
+- Missing host -> `HOST_NOT_FOUND`
+- Empty / unsafe `containerId` -> `CONFIG_INVALID`
+- Missing Docker binary / unsupported remote -> `REMOTE_UNSUPPORTED`
+- Docker permission denied or command failure -> `REMOTE_COMMAND_FAILED`
+- SSH authentication / connection / host-key failures -> existing SSH error mapping
+
+### 6. Tests Required
+
+- Validation test: empty or unsafe container identifiers are rejected.
+- Serialization test: `forceRemove` round-trips as camelCase.
+- Command mapping test: `forceRemove` renders fixed `docker rm -f <container>`.
+- Contract check: docs, TypeScript types, Rust serde structs, mocks, and command registration are updated together.
 
 ## known_hosts 校验
 

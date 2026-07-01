@@ -4,7 +4,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use openssh::{KnownHosts, Session, SessionBuilder};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     io::{ErrorKind, Write},
@@ -27,6 +27,16 @@ pub struct ConnectionInfo {
     pub fingerprint: Option<String>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum DockerContainerAction {
+    Start,
+    Stop,
+    Restart,
+    Remove,
+    ForceRemove,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RemoteCommand {
     ProcStat,
@@ -42,6 +52,10 @@ pub enum RemoteCommand {
     DockerContainerLogs {
         container_id: String,
         tail_lines: u16,
+    },
+    DockerContainerAction {
+        container_id: String,
+        action: DockerContainerAction,
     },
 }
 
@@ -67,6 +81,16 @@ impl RemoteCommand {
             } => {
                 format!("docker logs --tail {tail_lines} {container_id}")
             }
+            Self::DockerContainerAction {
+                container_id,
+                action,
+            } => match action {
+                DockerContainerAction::Start => format!("docker start {container_id}"),
+                DockerContainerAction::Stop => format!("docker stop {container_id}"),
+                DockerContainerAction::Restart => format!("docker restart {container_id}"),
+                DockerContainerAction::Remove => format!("docker rm {container_id}"),
+                DockerContainerAction::ForceRemove => format!("docker rm -f {container_id}"),
+            },
         }
     }
 }
@@ -469,6 +493,27 @@ impl OpenSshClient {
                 )
                 .await
             }
+            RemoteCommand::DockerContainerAction {
+                container_id,
+                action,
+            } => match action {
+                DockerContainerAction::Start => {
+                    Self::exec_program(session, "docker", &["start", container_id.as_str()]).await
+                }
+                DockerContainerAction::Stop => {
+                    Self::exec_program(session, "docker", &["stop", container_id.as_str()]).await
+                }
+                DockerContainerAction::Restart => {
+                    Self::exec_program(session, "docker", &["restart", container_id.as_str()]).await
+                }
+                DockerContainerAction::Remove => {
+                    Self::exec_program(session, "docker", &["rm", container_id.as_str()]).await
+                }
+                DockerContainerAction::ForceRemove => {
+                    Self::exec_program(session, "docker", &["rm", "-f", container_id.as_str()])
+                        .await
+                }
+            },
         }
     }
 

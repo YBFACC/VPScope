@@ -4,6 +4,7 @@ import type { VPScopeClient } from "@/lib/tauriClient";
 import type {
   AlertSettings,
   DockerContainer,
+  DockerContainerActionPayload,
   DockerContainerLogsPayload,
   HostConfig,
   HostCreatePayload,
@@ -36,7 +37,7 @@ let terminalSettings: TerminalSettings = {
   app: "terminal_app",
 };
 
-const mockDockerContainers: DockerContainer[] = [
+let mockDockerContainers: DockerContainer[] = [
   {
     id: "a83f7fca5fb1",
     name: "flux-logic-api",
@@ -156,6 +157,41 @@ function createMockDockerLogs(payload: DockerContainerLogsPayload) {
   });
 
   return repeatedLines.join("\n");
+}
+
+function updateMockDockerContainerAction(payload: DockerContainerActionPayload) {
+  const container = mockDockerContainers.find((item) => item.id === payload.containerId || item.name === payload.containerId);
+
+  if (!container) {
+    throw {
+      code: "REMOTE_COMMAND_FAILED",
+      message: "Docker container was not found",
+      retryable: true,
+    };
+  }
+
+  if (payload.action === "remove" || payload.action === "forceRemove") {
+    mockDockerContainers = mockDockerContainers.filter((item) => item.id !== container.id);
+    return;
+  }
+
+  const nextState = payload.action === "stop" ? "exited" : "running";
+  const nextStatus =
+    payload.action === "stop"
+      ? "Exited (0) just now"
+      : payload.action === "restart"
+        ? "Up less than a second"
+        : "Up less than a second";
+
+  mockDockerContainers = mockDockerContainers.map((item) =>
+    item.id === container.id
+      ? {
+          ...item,
+          state: nextState,
+          status: nextStatus,
+        }
+      : item,
+  );
 }
 
 function createSubscriptionSnapshot(hostId: HostId, profile = "active") {
@@ -352,7 +388,9 @@ export function createMockTauriClient(): VPScopeClient {
     },
     async listDockerContainers() {
       await wait(180);
-      return mockDockerContainers.map((container) => ({ ...container }));
+      return [...mockDockerContainers]
+        .sort((a, b) => Number(b.state.toLowerCase() === "running") - Number(a.state.toLowerCase() === "running"))
+        .map((container) => ({ ...container }));
     },
     async getDockerContainerLogs(payload) {
       await wait(220);
@@ -362,6 +400,16 @@ export function createMockTauriClient(): VPScopeClient {
         tailLines: payload.tailLines,
         logs: createMockDockerLogs(payload),
         fetchedAt: Date.now(),
+      };
+    },
+    async runDockerContainerAction(payload) {
+      await wait(260);
+      updateMockDockerContainerAction(payload);
+      return {
+        hostId: payload.hostId,
+        containerId: payload.containerId,
+        action: payload.action,
+        completedAt: Date.now(),
       };
     },
     async getTraySettings() {
