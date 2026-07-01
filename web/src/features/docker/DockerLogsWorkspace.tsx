@@ -18,6 +18,13 @@ const tailOptions: DockerLogTailLines[] = [100, 300, 1000];
 const autoRefreshOptions = [0, 1_000, 3_000, 5_000] as const;
 
 type AutoRefreshMs = (typeof autoRefreshOptions)[number];
+type DockerContainerGroup = {
+  id: string;
+  label: string;
+  composeProject?: string;
+  composeContainer?: DockerContainer;
+  containers: DockerContainer[];
+};
 
 type DockerLogsWorkspaceProps = {
   host: HostConfig;
@@ -27,8 +34,13 @@ type DockerLogsWorkspaceProps = {
 export function DockerLogsWorkspace({ host, onClose }: DockerLogsWorkspaceProps) {
   const { t } = useI18n();
   const logOutputRef = useRef<HTMLPreElement>(null);
+  const selectedContainerIdRef = useRef<string | undefined>(undefined);
+  const selectedComposeProjectRef = useRef<string | undefined>(undefined);
+  const tailLinesRef = useRef<DockerLogTailLines>(300);
+  const logRequestIdRef = useRef(0);
   const [containers, setContainers] = useState<DockerContainer[]>([]);
   const [selectedContainerId, setSelectedContainerId] = useState<string>();
+  const [selectedComposeProject, setSelectedComposeProject] = useState<string>();
   const [logsResult, setLogsResult] = useState<DockerContainerLogsResult>();
   const [tailLines, setTailLines] = useState<DockerLogTailLines>(300);
   const [autoRefreshMs, setAutoRefreshMs] = useState<AutoRefreshMs>(0);
@@ -38,7 +50,7 @@ export function DockerLogsWorkspace({ host, onClose }: DockerLogsWorkspaceProps)
   const [pendingAction, setPendingAction] = useState<DockerContainerAction>();
   const [pendingComposeAction, setPendingComposeAction] = useState<DockerComposeAction>();
   const [confirmRemoveContainer, setConfirmRemoveContainer] = useState<DockerContainer>();
-  const [confirmComposeProjectAction, setConfirmComposeProjectAction] = useState<DockerComposeAction>();
+  const [confirmComposeProjectContainer, setConfirmComposeProjectContainer] = useState<DockerContainer>();
   const [containerError, setContainerError] = useState<AppError>();
   const [logsError, setLogsError] = useState<AppError>();
   const [actionError, setActionError] = useState<AppError>();
@@ -58,8 +70,28 @@ export function DockerLogsWorkspace({ host, onClose }: DockerLogsWorkspaceProps)
       .filter((line) => line.toLowerCase().includes(needle));
   }, [logsResult?.logs, searchNeedle]);
 
+  const standaloneContainersLabel = t("standaloneContainers");
+  const containerGroups = useMemo(
+    () => groupDockerContainers(containers, standaloneContainersLabel),
+    [containers, standaloneContainersLabel],
+  );
+  const selectedComposeGroup = selectedComposeProject
+    ? containerGroups.find((group) => group.composeProject === selectedComposeProject)
+    : undefined;
+  const composeActionContainer = selectedComposeGroup?.composeContainer;
+  const logTitle = selectedComposeGroup
+    ? `${t("compose")} ${selectedComposeGroup.label}`
+    : (selectedContainer?.name ?? t("noContainerSelected"));
+  const logSubtitle = logsResult
+    ? `${t("last")} ${tailLines} · ${formatDateTime(logsResult.fetchedAt)}`
+    : selectedComposeGroup
+      ? `${selectedComposeGroup.containers.length} ${t("containers")}`
+      : selectedContainer?.status;
+
   const loadLogs = useCallback(
-    async (containerId: string, nextTailLines = tailLines) => {
+    async (containerId: string, nextTailLines = tailLinesRef.current) => {
+      const requestId = logRequestIdRef.current + 1;
+      logRequestIdRef.current = requestId;
       setIsLoadingLogs(true);
       setLogsError(undefined);
       try {
@@ -70,15 +102,79 @@ export function DockerLogsWorkspace({ host, onClose }: DockerLogsWorkspaceProps)
             tailLines: nextTailLines,
           }),
         );
+        if (requestId !== logRequestIdRef.current) {
+          return;
+        }
+        if (!selectedComposeProjectRef.current && selectedContainerIdRef.current === containerId) {
+          setSelectedComposeProject(undefined);
+          setSelectedContainerId(containerId);
+        }
         setLogsResult(result);
       } catch (error) {
+        if (requestId !== logRequestIdRef.current) {
+          return;
+        }
         setLogsResult(undefined);
         setLogsError(error as AppError);
       } finally {
-        setIsLoadingLogs(false);
+        if (requestId === logRequestIdRef.current) {
+          setIsLoadingLogs(false);
+        }
       }
     },
-    [host.id, tailLines],
+    [host.id],
+  );
+
+  const loadComposeLogs = useCallback(
+    async (group: DockerContainerGroup, nextTailLines = tailLinesRef.current) => {
+      const requestId = logRequestIdRef.current + 1;
+      logRequestIdRef.current = requestId;
+      setIsLoadingLogs(true);
+      setLogsError(undefined);
+      try {
+        const results = await Promise.all(
+          group.containers.map((container) =>
+            runClient(() =>
+              tauriClient.getDockerContainerLogs({
+                hostId: host.id,
+                containerId: container.id,
+                tailLines: nextTailLines,
+              }),
+            ).then((result) => ({ container, result })),
+          ),
+        );
+        if (requestId !== logRequestIdRef.current) {
+          return;
+        }
+        if (group.composeProject && selectedComposeProjectRef.current === group.composeProject) {
+          setSelectedComposeProject(group.composeProject);
+          setSelectedContainerId(undefined);
+        }
+
+        const logs = results
+          .map(({ container, result }) => `===== ${container.name} =====\n${result.logs}`)
+          .join("\n");
+        const fetchedAt = Math.max(...results.map(({ result }) => result.fetchedAt), Date.now());
+        setLogsResult({
+          hostId: host.id,
+          containerId: group.id,
+          tailLines: nextTailLines,
+          logs,
+          fetchedAt,
+        });
+      } catch (error) {
+        if (requestId !== logRequestIdRef.current) {
+          return;
+        }
+        setLogsResult(undefined);
+        setLogsError(error as AppError);
+      } finally {
+        if (requestId === logRequestIdRef.current) {
+          setIsLoadingLogs(false);
+        }
+      }
+    },
+    [host.id],
   );
 
   const loadContainers = useCallback(async () => {
@@ -88,42 +184,65 @@ export function DockerLogsWorkspace({ host, onClose }: DockerLogsWorkspaceProps)
       const nextContainers = await runClient(() => tauriClient.listDockerContainers(host.id));
       setContainers(nextContainers);
 
+      const nextGroups = groupDockerContainers(nextContainers, "standalone");
+      const selectedComposeProjectId = selectedComposeProjectRef.current;
+      const nextComposeGroup = selectedComposeProjectId
+        ? nextGroups.find((group) => group.composeProject === selectedComposeProjectId)
+        : undefined;
+      if (nextComposeGroup) {
+        selectedComposeProjectRef.current = nextComposeGroup.composeProject;
+        selectedContainerIdRef.current = undefined;
+        setSelectedComposeProject(nextComposeGroup.composeProject);
+        setSelectedContainerId(undefined);
+        await loadComposeLogs(nextComposeGroup);
+        return;
+      }
+
       const nextSelected =
-        nextContainers.find((container) => container.id === selectedContainerId)?.id ?? nextContainers[0]?.id;
+        nextContainers.find((container) => container.id === selectedContainerIdRef.current)?.id ?? nextContainers[0]?.id;
+      selectedComposeProjectRef.current = undefined;
+      selectedContainerIdRef.current = nextSelected;
+      setSelectedComposeProject(undefined);
       setSelectedContainerId(nextSelected);
 
       if (nextSelected) {
         await loadLogs(nextSelected);
       } else {
+        logRequestIdRef.current += 1;
         setLogsResult(undefined);
         setLogsError(undefined);
       }
     } catch (error) {
+      logRequestIdRef.current += 1;
       setContainers([]);
       setLogsResult(undefined);
       setContainerError(error as AppError);
     } finally {
       setIsLoadingContainers(false);
     }
-  }, [host.id, loadLogs, selectedContainerId]);
+  }, [host.id, loadComposeLogs, loadLogs]);
 
   useEffect(() => {
     void loadContainers();
   }, [loadContainers]);
 
   useEffect(() => {
-    if (!autoRefreshMs || !selectedContainerId) {
+    if (!autoRefreshMs || (!selectedContainerId && !selectedComposeGroup)) {
       return undefined;
     }
 
     const intervalId = window.setInterval(() => {
       if (!isLoadingLogs) {
-        void loadLogs(selectedContainerId);
+        if (selectedComposeGroup) {
+          void loadComposeLogs(selectedComposeGroup);
+        } else if (selectedContainerId) {
+          void loadLogs(selectedContainerId);
+        }
       }
     }, autoRefreshMs);
 
     return () => window.clearInterval(intervalId);
-  }, [autoRefreshMs, isLoadingLogs, loadLogs, selectedContainerId]);
+  }, [autoRefreshMs, isLoadingLogs, loadComposeLogs, loadLogs, selectedComposeGroup, selectedContainerId]);
 
   useEffect(() => {
     const frameId = window.requestAnimationFrame(() => {
@@ -134,7 +253,7 @@ export function DockerLogsWorkspace({ host, onClose }: DockerLogsWorkspaceProps)
     });
 
     return () => window.cancelAnimationFrame(frameId);
-  }, [logsResult?.fetchedAt, selectedContainerId, tailLines, visibleLogLines.length]);
+  }, [logsResult?.fetchedAt, selectedComposeProject, selectedContainerId, tailLines, visibleLogLines.length]);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -149,13 +268,34 @@ export function DockerLogsWorkspace({ host, onClose }: DockerLogsWorkspaceProps)
   }, [onClose]);
 
   async function selectContainer(container: DockerContainer) {
+    selectedComposeProjectRef.current = undefined;
+    selectedContainerIdRef.current = container.id;
+    setConfirmComposeProjectContainer(undefined);
+    setSelectedComposeProject(undefined);
     setSelectedContainerId(container.id);
     await loadLogs(container.id);
   }
 
+  async function selectComposeGroup(group: DockerContainerGroup) {
+    if (!group.composeProject) {
+      await selectContainer(group.containers[0]);
+      return;
+    }
+
+    selectedComposeProjectRef.current = group.composeProject;
+    selectedContainerIdRef.current = undefined;
+    setConfirmRemoveContainer(undefined);
+    setSelectedComposeProject(group.composeProject);
+    setSelectedContainerId(undefined);
+    await loadComposeLogs(group);
+  }
+
   async function selectTailLines(nextTailLines: DockerLogTailLines) {
+    tailLinesRef.current = nextTailLines;
     setTailLines(nextTailLines);
-    if (selectedContainerId) {
+    if (selectedComposeGroup) {
+      await loadComposeLogs(selectedComposeGroup, nextTailLines);
+    } else if (selectedContainerId) {
       await loadLogs(selectedContainerId, nextTailLines);
     }
   }
@@ -207,7 +347,7 @@ export function DockerLogsWorkspace({ host, onClose }: DockerLogsWorkspaceProps)
           action,
         }),
       );
-      setConfirmComposeProjectAction(undefined);
+      setConfirmComposeProjectContainer(undefined);
       await loadContainers();
     } catch (error) {
       setActionError(error as AppError);
@@ -287,27 +427,53 @@ export function DockerLogsWorkspace({ host, onClose }: DockerLogsWorkspaceProps)
               <div className="docker-empty">{t("noDockerContainers")}</div>
             ) : (
               <div className="docker-container-list">
-                {containers.map((container) => {
-                  const isRunning = container.state.toLowerCase() === "running";
+                {containerGroups.map((group) => {
+                  const isGroupActive = group.composeProject ? selectedComposeProject === group.composeProject : false;
                   return (
-                    <button
-                      key={container.id}
-                      type="button"
-                      onClick={() => void selectContainer(container)}
-                      className="docker-container-row"
-                      data-active={container.id === selectedContainerId}
-                    >
-                      <span
-                        className={clsx("docker-status-dot", isRunning ? "docker-status-dot-running" : "docker-status-dot-muted")}
-                      />
-                      <span className="min-w-0">
-                        <span className="block truncate text-[var(--color-text)]">{container.name}</span>
-                        <span className="block truncate text-[10px] text-[var(--color-text-muted)]">{container.image}</span>
-                      </span>
-                      <span className="truncate text-right text-[10px] uppercase text-[var(--color-text-muted)]">
-                        {container.state}
-                      </span>
-                    </button>
+                    <div key={group.id} className="docker-compose-group">
+                      <div className="docker-compose-group-header" data-active={isGroupActive}>
+                        <button
+                          type="button"
+                          className="docker-compose-group-title"
+                          onClick={() => void selectComposeGroup(group)}
+                        >
+                          <span className="docker-compose-group-name">
+                            {group.composeProject ? `${t("compose")} ${group.label}` : group.label}
+                          </span>
+                          <span className="docker-compose-group-meta">{group.containers.length}</span>
+                        </button>
+                      </div>
+                      <div className="docker-compose-group-containers">
+                        {group.containers.map((container) => {
+                          const isRunning = container.state.toLowerCase() === "running";
+                          return (
+                            <button
+                              key={container.id}
+                              type="button"
+                              onClick={() => void selectContainer(container)}
+                              className="docker-container-row"
+                              data-active={!selectedComposeProject && container.id === selectedContainerId}
+                            >
+                              <span
+                                className={clsx(
+                                  "docker-status-dot",
+                                  isRunning ? "docker-status-dot-running" : "docker-status-dot-muted",
+                                )}
+                              />
+                              <span className="min-w-0">
+                                <span className="block truncate text-[var(--color-text)]">{container.name}</span>
+                                <span className="block truncate text-[10px] text-[var(--color-text-muted)]">
+                                  {container.image}
+                                </span>
+                              </span>
+                              <span className="truncate text-right text-[10px] uppercase text-[var(--color-text-muted)]">
+                                {container.state}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                   );
                 })}
               </div>
@@ -318,15 +484,22 @@ export function DockerLogsWorkspace({ host, onClose }: DockerLogsWorkspaceProps)
             <div className="docker-log-toolbar">
               <div className="min-w-0">
                 <div className="truncate text-xs uppercase text-[var(--color-text)]">
-                  {selectedContainer?.name ?? t("noContainerSelected")}
+                  {logTitle}
                 </div>
                 <div className="truncate text-[10px] uppercase text-[var(--color-text-muted)]">
-                  {logsResult ? `${t("last")} ${tailLines} · ${formatDateTime(logsResult.fetchedAt)}` : selectedContainer?.status}
+                  {logSubtitle}
                 </div>
               </div>
-              <div className="docker-container-actions" aria-label={t("containers")}>
-                {selectedContainer ? (
-                  selectedContainerIsRunning ? (
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                className="docker-log-search"
+                placeholder={t("searchLogs")}
+                aria-label={t("searchLogs")}
+              />
+              {selectedContainer ? (
+                <div className="docker-container-actions" aria-label={t("containers")}>
+                  {selectedContainerIsRunning ? (
                     <>
                       <button
                         type="button"
@@ -354,49 +527,23 @@ export function DockerLogsWorkspace({ host, onClose }: DockerLogsWorkspaceProps)
                     >
                       {pendingAction === "start" ? t("requesting") : t("startContainer")}
                     </button>
-                  )
-                ) : null}
-                <button
-                  type="button"
-                  className="control-button docker-action-button docker-action-button-danger"
-                  onClick={() => selectedContainer && setConfirmRemoveContainer(selectedContainer)}
-                  disabled={!selectedContainer || actionsDisabled}
-                >
-                  {pendingAction === "remove" || pendingAction === "forceRemove" ? t("requesting") : t("removeContainer")}
-                </button>
-              </div>
-              <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                className="docker-log-search"
-                placeholder={t("searchLogs")}
-                aria-label={t("searchLogs")}
-              />
-              {selectedContainer?.compose ? (
+                  )}
+                  <button
+                    type="button"
+                    className="control-button docker-action-button docker-action-button-danger"
+                    onClick={() => setConfirmRemoveContainer(selectedContainer)}
+                    disabled={actionsDisabled}
+                  >
+                    {pendingAction === "remove" || pendingAction === "forceRemove" ? t("requesting") : t("removeContainer")}
+                  </button>
+                </div>
+              ) : null}
+              {composeActionContainer ? (
                 <div className="docker-compose-actions" aria-label={t("compose")}>
-                  <span className="docker-compose-chip">
-                    {t("compose")} {selectedContainer.compose.project}/{selectedContainer.compose.service}
-                  </span>
-                  <button
-                    type="button"
-                    className="control-button docker-compose-button"
-                    onClick={() => void runComposeAction("restartService")}
-                    disabled={actionsDisabled}
-                  >
-                    {pendingComposeAction === "restartService" ? t("requesting") : t("restartService")}
-                  </button>
-                  <button
-                    type="button"
-                    className="control-button docker-compose-button"
-                    onClick={() => void runComposeAction("rebuildService")}
-                    disabled={actionsDisabled}
-                  >
-                    {pendingComposeAction === "rebuildService" ? t("requesting") : t("rebuildService")}
-                  </button>
                   <button
                     type="button"
                     className="control-button docker-compose-button docker-action-button-danger"
-                    onClick={() => setConfirmComposeProjectAction("rebuildProject")}
+                    onClick={() => setConfirmComposeProjectContainer(composeActionContainer)}
                     disabled={actionsDisabled}
                   >
                     {pendingComposeAction === "rebuildProject" ? t("requesting") : t("rebuildProject")}
@@ -428,17 +575,17 @@ export function DockerLogsWorkspace({ host, onClose }: DockerLogsWorkspaceProps)
                   </button>
                 </div>
               ) : null}
-              {confirmComposeProjectAction && selectedContainer?.compose ? (
+              {confirmComposeProjectContainer?.compose ? (
                 <div className="docker-action-confirm" data-danger="true">
                   <span>
                     {t("confirmRebuildComposeProject", {
-                      name: selectedContainer.compose.project,
+                      name: confirmComposeProjectContainer.compose.project,
                     })}
                   </span>
                   <button
                     type="button"
                     className="control-button docker-action-confirm-button"
-                    onClick={() => setConfirmComposeProjectAction(undefined)}
+                    onClick={() => setConfirmComposeProjectContainer(undefined)}
                     disabled={Boolean(pendingComposeAction)}
                   >
                     {t("cancel")}
@@ -446,7 +593,7 @@ export function DockerLogsWorkspace({ host, onClose }: DockerLogsWorkspaceProps)
                   <button
                     type="button"
                     className="control-button docker-action-confirm-button docker-compose-confirm-button docker-action-button-danger"
-                    onClick={() => void runComposeAction(confirmComposeProjectAction)}
+                    onClick={() => void runComposeAction("rebuildProject", confirmComposeProjectContainer)}
                     disabled={Boolean(pendingComposeAction)}
                   >
                     {pendingComposeAction === "rebuildProject" ? t("requesting") : t("rebuildProject")}
@@ -465,7 +612,7 @@ export function DockerLogsWorkspace({ host, onClose }: DockerLogsWorkspaceProps)
               <ErrorBlock title={logsError.code} message={logsError.message} detail={logsError.detail} />
             ) : isLoadingLogs && !logsResult ? (
               <div className="docker-empty">{t("loadingLogs")}</div>
-            ) : selectedContainer ? (
+            ) : selectedContainer || selectedComposeGroup ? (
               <pre ref={logOutputRef} className="docker-log-output">
                 {visibleLogLines.length > 0
                   ? visibleLogLines.map((line, index) => (
@@ -478,7 +625,7 @@ export function DockerLogsWorkspace({ host, onClose }: DockerLogsWorkspaceProps)
             )}
 
             <footer className="docker-log-footer">
-              <span>{selectedContainer?.id ?? "--"}</span>
+              <span>{selectedComposeGroup?.id ?? selectedContainer?.id ?? "--"}</span>
               <span>{t("rows", { count: logLineCount })}</span>
             </footer>
           </section>
@@ -490,6 +637,33 @@ export function DockerLogsWorkspace({ host, onClose }: DockerLogsWorkspaceProps)
 
 function isContainerRunning(container?: DockerContainer) {
   return container?.state.toLowerCase() === "running";
+}
+
+function groupDockerContainers(containers: DockerContainer[], standaloneLabel: string): DockerContainerGroup[] {
+  const groups: DockerContainerGroup[] = [];
+  const groupsById = new Map<string, DockerContainerGroup>();
+
+  for (const container of containers) {
+    const compose = container.compose;
+    const id = compose ? `compose:${compose.project}` : "standalone";
+    let group = groupsById.get(id);
+
+    if (!group) {
+      group = {
+        id,
+        label: compose?.project ?? standaloneLabel,
+        composeProject: compose?.project,
+        composeContainer: compose ? container : undefined,
+        containers: [],
+      };
+      groupsById.set(id, group);
+      groups.push(group);
+    }
+
+    group.containers.push(container);
+  }
+
+  return groups;
 }
 
 function LogLine({ line, needle, isLast }: { line: string; needle: string; isLast: boolean }) {
