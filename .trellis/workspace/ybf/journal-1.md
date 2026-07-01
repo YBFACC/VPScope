@@ -149,3 +149,37 @@ Added Docker Compose-aware controls for restart service, rebuild service, and re
 ### Next Steps
 
 - None - task complete
+
+
+## Session 5: Refine Docker compose log actions
+
+**Date**: 2026-07-02
+**Task**: Refine Docker compose log actions
+**Package**: web
+**Branch**: `main`
+
+### Summary
+
+Refined Docker Compose log action interactions and presentation after the Compose rebuild work, updating the Docker logs workspace UI, styles, and localized copy.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `2cf9b0d` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
