@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 2
-- **Last Active**: 2026-06-23
+- **Total Sessions**: 3
+- **Last Active**: 2026-07-01
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~77 | Active |
+| `journal-1.md` | ~111 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 3 | 2026-07-01 | Add Docker container actions | `4bcaca6` | `main` |
 | 2 | 2026-06-23 | Finish Docker logs viewer MVP | `e37f08b`, `f0c1a53`, `7aeed36` | `main` |
 | 1 | 2026-06-23 | Archive source docs into Trellis spec | `8fc04e6` | `main` |
 <!-- @@@/auto:session-history -->

@@ -20,7 +20,10 @@ Archived project coding guidelines from AGENTS.md, Style.md, docs/roles, and doc
 
 ### Main Changes
 
-(Add details)
+- Added `docker_container_action` with fixed backend-owned Docker action mapping.
+- Added Docker workspace controls for start, stop, restart, remove, and force-remove after confirmation.
+- Updated cross-layer contracts, frontend client/types, mock behavior, backend command registration, and SSH security spec.
+- Archived the completed `docker-container-actions` child task and kept the Compose rebuild follow-up task active.
 
 ### Git Commits
 
@@ -30,7 +33,10 @@ Archived project coding guidelines from AGENTS.md, Style.md, docs/roles, and doc
 
 ### Testing
 
-- [OK] (Add test results)
+- [OK] `pnpm --dir web exec tsc --noEmit`
+- [OK] `pnpm --dir web build`
+- [OK] `cargo fmt --check`
+- [OK] `perl -e 'alarm shift; exec @ARGV' 60 cargo test`
 
 ### Status
 
@@ -63,6 +69,40 @@ Completed the Docker logs viewer MVP: added overlay workspace entry from saved h
 | `e37f08b` | (see git log) |
 | `f0c1a53` | (see git log) |
 | `7aeed36` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 3: Add Docker container actions
+
+**Date**: 2026-07-01
+**Task**: Add Docker container actions
+**Package**: web
+**Branch**: `main`
+
+### Summary
+
+Implemented first-stage Docker container management actions with fixed backend command mapping, frontend controls, mock behavior, contracts, specs, and validation.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `4bcaca6` | (see git log) |
 
 ### Testing
 
